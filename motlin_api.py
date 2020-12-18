@@ -7,7 +7,9 @@ def get_access_token(redis_conn):
     access_token = redis_conn.get('access_token')
     if not access_token:
         data = {'client_id': os.getenv('MOTLIN_CLIENT_ID'),
-                'grant_type': 'implicit'}
+                'client_secret': os.getenv('MOTLIN_CLIENT_SECRET'),
+                'grant_type': 'client_credentials',
+                }
         response = requests.get('https://api.moltin.com/oauth/access_token',
                                 data=data)
         response.raise_for_status()
@@ -17,6 +19,58 @@ def get_access_token(redis_conn):
         redis_conn.set('access_token', access_token, ex=time_to_expire_s)
     return access_token
 
+
+def create_product(access_token, name, description, price, id_pizza):
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+    data = {
+        "data": {
+            "type": "product", "name": name, "slug": id_pizza,
+            "sku": id_pizza, "description": description,
+            "manage_stock": False, "price": [
+                {"amount": price, "currency": "RUB", "includes_tax": True}],
+            "status": "live", "commodity_type": "physical"}}
+    response = requests.post(
+        'https://api.moltin.com/v2/products',
+        headers=headers, json=data)
+    response.raise_for_status()
+    return response.json()
+
+
+def upload_file(access_token, image_path):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+
+    files = {
+        'file': (image_path, open(image_path, 'rb')),
+        'public': (None, 'true'),
+    }
+
+    response = requests.post(
+        'https://api.moltin.com/v2/files', headers=headers, files=files)
+    response.raise_for_status()
+    return response.json()
+
+
+def create_relationship(access_token, id_project, id_image):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+
+    data = {
+        "data": {
+            "type": "main_image",
+            "id": id_image}}
+    response = requests.post(
+        f'https://api.moltin.com/v2/products/{id_project}/relationships/main-image',
+        headers=headers, json=data)
+    response.raise_for_status()
+    
 
 def get_element_by_id(access_token, id):
     response = requests.get(
@@ -72,9 +126,9 @@ def get_cart(access_token, chat_id):
     return response.json()
 
 
-def get_image_link(access_token, image_id):
+def get_image_link(access_token, id_image):
     response = requests.get(
-        f'https://api.moltin.com/v2/files/{image_id}',
+        f'https://api.moltin.com/v2/files/{id_image}',
         headers={
             'Authorization': f'Bearer {access_token}'})
     response.raise_for_status()
