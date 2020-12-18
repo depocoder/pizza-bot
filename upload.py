@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 import redis
 
 from motlin_api import (
-    get_access_token, create_product, upload_file, create_relationship)
+    get_access_token, create_product, upload_file, create_relationship,
+    create_an_entry)
 
 
 def download_photo(id_pizza, url_img):
@@ -57,7 +58,20 @@ def main():
     redis_conn = redis.Redis(
         host=os.getenv('REDIS_HOST'), password=os.getenv('REDIS_PASSWORD'),
         port=os.getenv('REDIS_PORT'), db=0, decode_responses=True)
-    upload_catalogue(redis_conn)
+    # upload_catalogue(redis_conn)
+    with open("addresses.json", "r", encoding='utf-8') as my_file:
+        addresses = json.load(my_file)
+    access_token = get_access_token(redis_conn)
+    flow_slug = "1"
+    for entry in addresses:
+        alias = entry['alias']
+        address = entry['address']['full']
+        coordinates = entry['coordinates']
+        latitude = coordinates['lat']
+        longitude = coordinates['lon']
+        create_an_entry(
+            access_token, address, alias, float(longitude),
+            float(latitude), flow_slug)
 
 
 if __name__ == "__main__":

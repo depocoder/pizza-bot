@@ -21,7 +21,6 @@ def get_access_token(redis_conn):
 
 
 def create_product(access_token, name, description, price, id_pizza):
-
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json',
@@ -40,7 +39,7 @@ def create_product(access_token, name, description, price, id_pizza):
     return response.json()
 
 
-def create_flow(access_token, id_flow, name_flow):
+def create_flow(access_token, id_flow, name_flow, description):
     headers = {
         'Authorization': 'Bearer {access_token}',
         'Content-Type': 'application/json',
@@ -48,7 +47,7 @@ def create_flow(access_token, id_flow, name_flow):
 
     data = {"data": {
         "type": "flow", "name": name_flow,
-        "slug": id_flow, "description": "Extends the default product object",
+        "slug": id_flow, "description": description,
         "enabled": True}}
     response = requests.post(
         'https://api.moltin.com/v2/flows',
@@ -57,7 +56,7 @@ def create_flow(access_token, id_flow, name_flow):
 
 
 def create_field_flow(
-        access_token, field_id, field_name, slug_id, field_type):
+        access_token, flow_id, field_name, slug_id, field_type, description):
 
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -69,12 +68,35 @@ def create_field_flow(
         "slug": slug_id, "field_type": field_type,
         "validation_rules": [{
             "type": "between", "options": {"from": 1, "to": 5}}],
-        "description": "Average rating as given by our users",
+        "description": description,
         "required": False, "default": 0, "enabled": True, "order": 1,
         "omit_null": False, "relationships": {
-            "flow": {"data": {"type": "flow", "id": field_id}}}}}
+            "flow": {"data": {"type": "flow", "id": flow_id}}}}}
 
-    response = requests.post('https://api.moltin.com/v2/fields', headers=headers, data=data)
+    response = requests.post(
+        'https://api.moltin.com/v2/fields', headers=headers, data=data)
+    response.raise_for_status()
+
+
+def create_an_entry(
+        access_token, address, alias, longitude, latitude, flow_slug):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+        }
+
+    data = {"data": {
+        "type": "entry",
+        "1": address,
+        "2": alias,
+        "3": longitude,
+        "4": latitude}}
+
+    response = requests.post(
+        f'https://api.moltin.com/v2/flows/{flow_slug}/entries',
+        headers=headers, json=data)
+    print(response.text)
+    
     response.raise_for_status()
 
 
