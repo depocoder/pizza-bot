@@ -40,6 +40,44 @@ def create_product(access_token, name, description, price, id_pizza):
     return response.json()
 
 
+def create_flow(access_token, id_flow, name_flow):
+    headers = {
+        'Authorization': 'Bearer {access_token}',
+        'Content-Type': 'application/json',
+        }
+
+    data = {"data": {
+        "type": "flow", "name": name_flow,
+        "slug": id_flow, "description": "Extends the default product object",
+        "enabled": True}}
+    response = requests.post(
+        'https://api.moltin.com/v2/flows',
+        headers=headers, json=data)
+    response.raise_for_status()
+
+
+def create_field_flow(
+        access_token, field_id, field_name, slug_id, field_type):
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+
+    data = {"data": {
+        "type": "field", "name": field_name,
+        "slug": slug_id, "field_type": field_type,
+        "validation_rules": [{
+            "type": "between", "options": {"from": 1, "to": 5}}],
+        "description": "Average rating as given by our users",
+        "required": False, "default": 0, "enabled": True, "order": 1,
+        "omit_null": False, "relationships": {
+            "flow": {"data": {"type": "flow", "id": field_id}}}}}
+
+    response = requests.post('https://api.moltin.com/v2/fields', headers=headers, data=data)
+    response.raise_for_status()
+
+
 def upload_file(access_token, image_path):
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -70,7 +108,7 @@ def create_relationship(access_token, id_project, id_image):
         f'https://api.moltin.com/v2/products/{id_project}/relationships/main-image',
         headers=headers, json=data)
     response.raise_for_status()
-    
+
 
 def get_element_by_id(access_token, id):
     response = requests.get(
