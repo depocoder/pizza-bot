@@ -25,12 +25,7 @@ def download_photo(id_pizza, url_img):
     return rel_img_path
 
 
-@logger.catch
-def main():
-    load_dotenv()
-    redis_conn = redis.Redis(
-        host=os.getenv('REDIS_HOST'), password=os.getenv('REDIS_PASSWORD'),
-        port=os.getenv('REDIS_PORT'), db=0, decode_responses=True)
+def upload_catalogue(redis_conn):
     with open("menu.json", "r", encoding='utf-8') as my_file:
         menu_pizza = json.load(my_file)
     Path(os.getcwd(), 'images').mkdir(parents=True, exist_ok=True)
@@ -54,6 +49,16 @@ def main():
 
     path = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'images')
     shutil.rmtree(path)
+
+
+@logger.catch
+def main():
+    load_dotenv()
+    redis_conn = redis.Redis(
+        host=os.getenv('REDIS_HOST'), password=os.getenv('REDIS_PASSWORD'),
+        port=os.getenv('REDIS_PORT'), db=0, decode_responses=True)
+    upload_catalogue(redis_conn)
+
 
 if __name__ == "__main__":
     main()
