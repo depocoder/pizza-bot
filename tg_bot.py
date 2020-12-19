@@ -1,5 +1,8 @@
 import os
 import textwrap
+from pprint import pprint
+from operator import itemgetter
+
 from loguru import logger
 from requests.exceptions import HTTPError
 from validate_email import validate_email
@@ -9,10 +12,12 @@ from telegram.ext import Filters, Updater
 from telegram.ext import (
     CallbackQueryHandler, CommandHandler, MessageHandler, CallbackContext)
 import redis
+from geopy import distance
 
 from motlin_api import (
     get_products, get_access_token, get_element_by_id,
-    get_image_link, add_to_cart, get_cart, delete_from_cart, create_customer)
+    get_image_link, add_to_cart, get_cart, delete_from_cart, create_customer,
+    get_all_entrys)
 from yandex_api import fetch_coordinates
 
 
@@ -136,11 +141,60 @@ def handle_description(update: Update, context: CallbackContext):
     return 'HANDLE_DESCRIPTION'
 
 
+def get_near_entry(current_pos, redis_conn):
+    distances = []
+    current_pos = [float(didgit) for didgit in current_pos]
+    access_token = get_access_token(redis_conn)
+    entrys = get_all_entrys(access_token)['data']
+    for entry in entrys:
+        distances.append(distance.distance(
+            (float(entry['3']), float(entry['4'])), current_pos).km)
+    min_distance = min(distances)
+    index_near_entry = distances.index(min_distance)
+    return entrys[index_near_entry], min_distance
+
+
+def generate_message_dilivery(update, context, entry, min_distance):
+    if min_distance <= 0.5:
+        text_message = (
+            f'''\
+            Может, заберете пиццу у нашей пиццерии неподалёку?
+            Она всего в {int(min_distance*100)} метрах от вас!
+            Вот её адрес: {entry['1']}.
+
+            А можем доставить бесплатно нам не сложно!
+            ''')
+    elif min_distance <= 5:
+        text_message = (
+            '''\
+            Похоже ехать до вас придется на самокате.
+            Доставка будет стоить 100р. Доставляем или самовывоз?
+            ''')
+    elif min_distance <= 20:
+        text_message = (
+            '''\
+            Похоже ехать до вас придется на самокате.
+            Доставка будет стоить 300р. Доставляем или самовывоз?
+            ''')
+    else:
+        text_message = (
+            f'''\
+            Простите, но вы слишком далеко мы пиццу не доставим.
+            Ближайщая пиццерия аж в {round(min_distance)}километрах от вас!
+            ''')
+    return textwrap.dedent(text_message)
+
+
+
 def handle_waiting(update: Update, context: CallbackContext):
     if update.message.text:
         try:
-            lon, lat = fetch_coordinates(os.getenv('YANDEX_GEOCODER'), update.message.text)
+            current_pos = fetch_coordinates(
+                os.getenv('YANDEX_GEOCODER'), update.message.text)
         except IndexError:
+            context.bot.send_message(
+                text='Вы указали неправильно данные, попробуйте снова.',
+                chat_id=update.effective_user.id)
             return "HANDLE_WAITING"
     else:
         message = None
@@ -149,8 +203,14 @@ def handle_waiting(update: Update, context: CallbackContext):
         else:
             message = update.message
         current_pos = (message.location.latitude, message.location.longitude)
-        context.bot.send_message(
-            text=current_pos, chat_id=update.effective_user.id)
+    entry, min_distance = get_near_entry(current_pos, redis_conn)
+    text_message = generate_message_dilivery(
+        update, context, entry, min_distance)
+    context.bot.send_message(
+        text=text_message,
+        chat_id=update.effective_user.id)
+    return "HANDLE_WAITING"
+
 
 
 def handle_menu(update: Update, context: CallbackContext):
