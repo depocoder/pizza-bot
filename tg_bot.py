@@ -216,6 +216,18 @@ def send_the_order_to_the_courier(
             latitude=lat, longitude=lon, chat_id=courier_id)
 
 
+def callback_alarm(context):
+    job = context.job
+    text_message = (
+        '''\
+        Приятного аппетита! *место для рекламы*
+
+        *сообщение что делать если пицца не пришла*
+        ''')
+    text_message = textwrap.dedent(text_message)
+    context.bot.send_message(chat_id=job.context, text=text_message)
+
+
 def handle_delivery(update: Update, context: CallbackContext):
     query = update.callback_query
     user_chat_id = update.effective_user.id
@@ -248,6 +260,7 @@ def handle_delivery(update: Update, context: CallbackContext):
         send_the_order_to_the_courier(
             update, context, entry, user_chat_id, lat, lon)
         start(update, context)
+        context.job_queue.run_once(callback_alarm, 3600, context=user_chat_id, name=str(user_chat_id))
         return 'HANDLE_DESCRIPTION'
 
 
