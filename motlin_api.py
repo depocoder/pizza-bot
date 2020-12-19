@@ -3,6 +3,18 @@ import os
 import requests
 
 
+def get_all_entrys(access_token):
+
+    response = requests.get(
+        'https://api.moltin.com/v2/flows/1/entries',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            })
+
+    response.raise_for_status()
+    return response.json()
+
+
 def get_access_token(redis_conn):
     access_token = redis_conn.get('access_token')
     if not access_token:
