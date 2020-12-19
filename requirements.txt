@@ -1,4 +1,6 @@
-python-dotenv==0.14.0
 loguru==0.5.3
+requests==2.25.0
+python-dotenv==0.14.0
+python-telegram-bot==13.1
 redis==3.5.3
-requests==2.25.1
+validate_email==1.3
