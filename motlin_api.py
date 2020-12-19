@@ -95,8 +95,6 @@ def create_an_entry(
     response = requests.post(
         f'https://api.moltin.com/v2/flows/{flow_slug}/entries',
         headers=headers, json=data)
-    print(response.text)
-    
     response.raise_for_status()
 
 
