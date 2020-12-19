@@ -1,11 +1,7 @@
 import os
 import textwrap
-from pprint import pprint
-from operator import itemgetter
 
 from loguru import logger
-from requests.exceptions import HTTPError
-from validate_email import validate_email
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Filters, Updater
@@ -16,12 +12,25 @@ from geopy import distance
 
 from motlin_api import (
     get_products, get_access_token, get_element_by_id,
-    get_image_link, add_to_cart, get_cart, delete_from_cart, create_customer,
-    get_all_entrys)
+    get_image_link, add_to_cart, get_cart, delete_from_cart,
+    get_all_entrys, create_an_entry)
 from yandex_api import fetch_coordinates
 
 
+def create_customer_adreess(redis_conn, lat, lon):
+    access_token = get_access_token(redis_conn)
+
+    data = {
+        "data": {
+            "type": "entry",
+            "1": lat,
+            "2": lon}}
+    create_an_entry(
+            access_token, data, 2)
+
+
 def format_description(product_info):
+    """Формотирует описание для пиццы"""
     name = product_info['name']
     description = product_info['description']
     price = product_info['meta']['display_price']['with_tax']['formatted']
@@ -36,6 +45,7 @@ def format_description(product_info):
 
 
 def format_cart(cart):
+    """Форматирует корзину"""
     filtred_cart = []
     pizza_names = []
     pizza_ids = []
@@ -62,11 +72,12 @@ def format_cart(cart):
             {pizza['quantity']} пицц в корзине на сумму {pizza['total']}
 
             ''')
-    text_message += f'{total_to_pay}'
+    text_message += f'к оплате {total_to_pay}'
     return textwrap.dedent(text_message), pizza_names, pizza_ids
 
 
 def start(update: Update, context: CallbackContext):
+    """Выводит все товары"""
     access_token = get_access_token(redis_conn)
     keyboard_product = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in get_products(access_token)]
@@ -81,6 +92,7 @@ def start(update: Update, context: CallbackContext):
 
 
 def handle_cart(update: Update, context: CallbackContext):
+    """Показывает корзину"""
     access_token = get_access_token(redis_conn)
     chat_id = update.effective_user.id
     cart = get_cart(access_token, chat_id)
@@ -110,6 +122,7 @@ def handle_cart(update: Update, context: CallbackContext):
 
 
 def handle_description(update: Update, context: CallbackContext):
+    """Отправляет по хэндлам"""
     query = update.callback_query
     query.answer()
     access_token = get_access_token(redis_conn)
@@ -125,9 +138,8 @@ def handle_description(update: Update, context: CallbackContext):
     elif query.data == 'Оплатить':
         query.message.delete()
         context.bot.send_message(
-            text='Пожалуйста укажите ваш email пример "myemail@gmail.com"',
-            chat_id=chat_id)
-        return "WAITING_EMAIL"
+            text="Отправьте мне вашу локацию или адрес", chat_id=chat_id)
+        return "HANDLE_WAITING"
     elif 'Убрать' in query.data:
         item_id = query.data.split("|")[1]
         delete_from_cart(access_token, item_id, chat_id)
@@ -142,6 +154,7 @@ def handle_description(update: Update, context: CallbackContext):
 
 
 def get_near_entry(current_pos, redis_conn):
+    """Возвращает ближайщую пиццерию и расстояние до неё в км"""
     distances = []
     current_pos = [float(didgit) for didgit in current_pos]
     access_token = get_access_token(redis_conn)
@@ -164,26 +177,78 @@ def generate_message_dilivery(update, context, entry, min_distance):
 
             А можем доставить бесплатно нам не сложно!
             ''')
+        can_we_deliver = True
     elif min_distance <= 5:
         text_message = (
             '''\
             Похоже ехать до вас придется на самокате.
             Доставка будет стоить 100р. Доставляем или самовывоз?
             ''')
+        can_we_deliver = True
     elif min_distance <= 20:
         text_message = (
             '''\
             Похоже ехать до вас придется на самокате.
             Доставка будет стоить 300р. Доставляем или самовывоз?
             ''')
+        can_we_deliver = True
     else:
         text_message = (
             f'''\
             Простите, но вы слишком далеко мы пиццу не доставим.
             Ближайщая пиццерия аж в {round(min_distance)}километрах от вас!
             ''')
-    return textwrap.dedent(text_message)
+        can_we_deliver = False
+    return textwrap.dedent(text_message), can_we_deliver
 
+
+def send_the_order_to_the_courier(
+        update, context, entry, user_chat_id, lat, lon):
+
+    access_token = get_access_token(redis_conn)
+    cart = get_cart(access_token, user_chat_id)
+    text_message = format_cart(cart)[0]
+    courier_id = entry['5']
+    context.bot.send_message(
+            text=text_message,
+            chat_id=courier_id)
+    context.bot.send_location(
+            latitude=lat, longitude=lon, chat_id=courier_id)
+
+
+def handle_delivery(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_chat_id = update.effective_user.id
+    query.answer()
+    user_answer = query.data
+    query.message.delete()
+    user_order = context.user_data.get("user_order")
+    if not user_order:
+        context.bot.send_message(
+            text='Произошла ошибка, возвращаю вас в корзину.',
+            chat_id=user_chat_id)
+        handle_cart(update, context)
+        return "HANDLE_DESCRIPTION"
+    if user_answer == 'Самовывоз':
+        pizzeria_address = user_order['pizzeria_address']['1']
+        context.bot.send_message(
+            text=f'Спасибо за заказ, будем ждать вам в ресторане {pizzeria_address} Возвращаю вас в меню.',
+            chat_id=user_chat_id)
+        start(update, context)
+        return "HANDLE_DESCRIPTION"
+    else:
+
+        lat = user_order['lat']
+        lon = user_order['lon']
+        context.bot.send_message(
+            text='Мы уже оповестили курьера, ждите ваш заказ! Возвращаю вас в меню.',
+            chat_id=update.effective_user.id)
+        create_customer_adreess(redis_conn, lat, lon)
+        entry = user_order['pizzeria_address']
+        send_the_order_to_the_courier(
+            update, context, entry, user_chat_id, lat, lon)
+        start(update, context)
+        return 'HANDLE_DESCRIPTION'
 
 
 def handle_waiting(update: Update, context: CallbackContext):
@@ -191,6 +256,7 @@ def handle_waiting(update: Update, context: CallbackContext):
         try:
             current_pos = fetch_coordinates(
                 os.getenv('YANDEX_GEOCODER'), update.message.text)
+            lon, lat = current_pos
         except IndexError:
             context.bot.send_message(
                 text='Вы указали неправильно данные, попробуйте снова.',
@@ -202,15 +268,37 @@ def handle_waiting(update: Update, context: CallbackContext):
             message = update.edited_message
         else:
             message = update.message
-        current_pos = (message.location.latitude, message.location.longitude)
-    entry, min_distance = get_near_entry(current_pos, redis_conn)
-    text_message = generate_message_dilivery(
-        update, context, entry, min_distance)
-    context.bot.send_message(
-        text=text_message,
-        chat_id=update.effective_user.id)
-    return "HANDLE_WAITING"
+        lat, lon = (message.location.latitude, message.location.longitude)
 
+    entry, min_distance = get_near_entry([lon, lat], redis_conn)
+    text_message, can_we_deliver = generate_message_dilivery(
+        update, context, entry, min_distance)
+    keyboard = [
+        [InlineKeyboardButton('В меню', callback_data='В меню')]]
+
+    if not can_we_deliver:
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(
+            text=text_message,
+            chat_id=update.effective_user.id,
+            reply_markup=reply_markup)
+        return "HANDLE_DESCRIPTION"
+
+    user_order = {
+        'lat': lat,
+        'lon': lon,
+        'pizzeria_address': entry}
+    context.user_data.update({"user_order": user_order})
+
+    keyboard = [
+        [InlineKeyboardButton('Самовывоз', callback_data='Самовывоз')],
+        [InlineKeyboardButton(
+            'Доставка', callback_data='{user_order}')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(
+        text=text_message, chat_id=update.effective_user.id,
+        reply_markup=reply_markup)
+    return "HANDLE_DELIVERY"
 
 
 def handle_menu(update: Update, context: CallbackContext):
@@ -236,25 +324,6 @@ def handle_menu(update: Update, context: CallbackContext):
     return "HANDLE_DESCRIPTION"
 
 
-def waiting_email(update: Update, context: CallbackContext):
-    users_reply = update.message.text
-    is_valid = validate_email(users_reply)
-    if is_valid:
-        access_token = get_access_token(redis_conn)
-        try:
-            create_customer(
-                access_token, str(update.effective_user.id), users_reply)
-        except HTTPError:
-            update.message.reply_text('Ошибка такой Email уже указывали!')
-            return "WAITING_EMAIL"
-        update.message.reply_text(
-            f"Вы прислали мне эту почту - {users_reply}. Мы скоро свяжемся.")
-        update.message.reply_text("Отправьте мне вашу локацию или адрес")
-        return "HANDLE_WAITING"
-    update.message.reply_text(f"Ошибка! неверный email - '{users_reply}'")
-    return "WAITING_EMAIL"
-
-
 def handle_users_reply(update: Update, context: CallbackContext):
     chat_id = update.effective_user.id
     if update.message:
@@ -273,23 +342,12 @@ def handle_users_reply(update: Update, context: CallbackContext):
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
-        'WAITING_EMAIL': waiting_email,
         'HANDLE_WAITING': handle_waiting,
+        'HANDLE_DELIVERY': handle_delivery,
     }
     state_handler = states_functions[user_state]
     next_state = state_handler(update, context)
     redis_conn.set(chat_id, next_state)
-
-
-def location(update: Update, context: CallbackContext):
-    message = None
-    if update.edited_message:
-        message = update.edited_message
-    else:
-        message = update.message
-    current_pos = (message.location.latitude, message.location.longitude)
-    context.bot.send_message(
-        text=current_pos, chat_id=update.effective_user.id)
 
 
 def error_handler(update: Update, context: CallbackContext):
