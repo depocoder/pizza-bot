@@ -64,14 +64,17 @@ def main():
     access_token = get_access_token(redis_conn)
     flow_slug = "1"
     for entry in addresses:
-        alias = entry['alias']
-        address = entry['address']['full']
         coordinates = entry['coordinates']
-        latitude = coordinates['lat']
-        longitude = coordinates['lon']
+        #  Обязательно не забудьте создать Flow, и поля для него!
+        data = {
+            "data": {
+                "type": "entry",
+                "1": entry['address']['full'],
+                "2": entry['alias'],
+                "3": coordinates['lon'],
+                "4": coordinates['lat']}}
         create_an_entry(
-            access_token, address, alias, float(longitude),
-            float(latitude), flow_slug)
+            access_token, data, flow_slug)
 
 
 if __name__ == "__main__":

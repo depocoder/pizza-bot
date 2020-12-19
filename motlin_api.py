@@ -91,18 +91,11 @@ def create_field_flow(
 
 
 def create_an_entry(
-        access_token, address, alias, longitude, latitude, flow_slug):
+        access_token, data, flow_slug):
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Content-Type': 'application/json',
         }
-
-    data = {"data": {
-        "type": "entry",
-        "1": address,
-        "2": alias,
-        "3": longitude,
-        "4": latitude}}
 
     response = requests.post(
         f'https://api.moltin.com/v2/flows/{flow_slug}/entries',
