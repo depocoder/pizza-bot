@@ -262,22 +262,15 @@ def start_with_shipping_callback(update: Update, context: CallbackContext) -> No
     chat_id = update.effective_user.id
     title = "Оплата пиццы"
     description = "Оплата пиццы из ресторана DDOS PIZZA"
-    # select a payload just for you to recognize its the donation from your bot
     payload = "Custom-Payload"
-    # In order to get a provider_token see https://core.telegram.org/bots/payments#getting-a-token
     provider_token = os.getenv('TRANZZO_TOKEN')
     start_parameter = "test-payment"
     currency = "RUB"
-    # price in rubs
     price_delivery = context.user_data.get("price_delivery")
     pizza_cost = context.user_data.get("pizza_cost")
     price = pizza_cost + price_delivery
-    # price * 100 so as to include 2 decimal points
-    # check https://core.telegram.org/bots/payments#supported-currencies for more details
     prices = [LabeledPrice("Test", price * 100)]
 
-    # optionally pass need_name=True, need_phone_number=True,
-    # need_email=True, need_shipping_address=True, is_flexible=True
     context.bot.send_invoice(
         chat_id,
         title,
@@ -297,15 +290,11 @@ def start_with_shipping_callback(update: Update, context: CallbackContext) -> No
 
 def shipping_callback(update: Update, context: CallbackContext) -> None:
     query = update.shipping_query
-    # check the payload, is this from your bot?
     if query.invoice_payload != 'Custom-Payload':
-        # answer False pre_checkout_query
         query.answer(
             ok=False, error_message="Что-то сломалось.")
     options = list()
-    # a single LabeledPrice
     options.append(ShippingOption('1', 'Shipping Option A', [LabeledPrice('A', 100)]))
-    # an array of LabeledPrice objects
     price_list = [LabeledPrice('B1', 150), LabeledPrice('B2', 200)]
     options.append(ShippingOption('2', 'Shipping Option B', price_list))
     query.answer(ok=True, shipping_options=options)
@@ -313,18 +302,14 @@ def shipping_callback(update: Update, context: CallbackContext) -> None:
 
 def precheckout_callback(update: Update, context: CallbackContext) -> None:
     query = update.pre_checkout_query
-    # check the payload, is this from your bot?
     if query.invoice_payload != 'Custom-Payload':
-        # answer False pre_checkout_query
         query.answer(ok=False, error_message="ОШИБКА! Возвращаю в меню!")
         start(update, context)
     else:
         query.answer(ok=True)
 
 
-# finally, after contacting the payment provider...
 def successful_payment_callback(update: Update, context: CallbackContext) -> None:
-    # do something after successfully receiving payment?
     user_chat_id = update.effective_user.id
     context.bot.send_message(
         text='Оплата успешно прошла! Отправили информацию курьеру!',
