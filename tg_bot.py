@@ -1,12 +1,13 @@
 import os
 import textwrap
-
+from pprint import pprint
 from loguru import logger
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Filters, Updater
+from telegram import (
+    InlineKeyboardButton, InlineKeyboardMarkup, Update, LabeledPrice, ShippingOption)
 from telegram.ext import (
-    CallbackQueryHandler, CommandHandler, MessageHandler, CallbackContext)
+    Filters, Updater, CallbackQueryHandler, CommandHandler, MessageHandler, CallbackContext,
+    PreCheckoutQueryHandler, ShippingQueryHandler)
 import redis
 from geopy import distance
 
@@ -44,7 +45,7 @@ def format_description(product_info):
     return textwrap.dedent(text_mess)
 
 
-def format_cart(cart):
+def format_cart(cart, context):
     """Форматирует корзину"""
     filtred_cart = []
     pizza_names = []
@@ -60,7 +61,7 @@ def format_cart(cart):
         })
         pizza_names.append(pizza["name"])
         pizza_ids.append(pizza["id"])
-    total_to_pay = cart['meta']['display_price']['without_tax']['formatted']
+    total_to_pay = cart['meta']['display_price']['without_tax']['amount']
     text_message = ''
     for pizza in filtred_cart:
         text_message += (
@@ -72,6 +73,7 @@ def format_cart(cart):
             {pizza['quantity']} пицц в корзине на сумму {pizza['total']}
 
             ''')
+    context.user_data.update({"pizza_cost": total_to_pay})
     text_message += f'к оплате {total_to_pay}'
     return textwrap.dedent(text_message), pizza_names, pizza_ids
 
@@ -106,7 +108,7 @@ def handle_cart(update: Update, context: CallbackContext):
             text=text_message, chat_id=chat_id, reply_markup=reply_markup)
         return "HANDLE_DESCRIPTION"
 
-    text_message, pizza_names, pizza_ids = format_cart(cart)
+    text_message, pizza_names, pizza_ids = format_cart(cart, context)
     for name_pizza, id_pizza in zip(pizza_names, pizza_ids):
         keyboard.append(
             [InlineKeyboardButton(
@@ -177,6 +179,7 @@ def generate_message_dilivery(update, context, entry, min_distance):
 
             А можем доставить бесплатно нам не сложно!
             ''')
+        context.user_data.update({"price_delivery": 0})
         can_we_deliver = True
     elif min_distance <= 5:
         text_message = (
@@ -185,12 +188,14 @@ def generate_message_dilivery(update, context, entry, min_distance):
             Доставка будет стоить 100р. Доставляем или самовывоз?
             ''')
         can_we_deliver = True
+        context.user_data.update({"price_delivery": 100})
     elif min_distance <= 20:
         text_message = (
             '''\
             Похоже ехать до вас придется на самокате.
             Доставка будет стоить 300р. Доставляем или самовывоз?
             ''')
+        context.user_data.update({"price_delivery": 300})
         can_we_deliver = True
     else:
         text_message = (
@@ -207,7 +212,7 @@ def send_the_order_to_the_courier(
 
     access_token = get_access_token(redis_conn)
     cart = get_cart(access_token, user_chat_id)
-    text_message = format_cart(cart)[0]
+    text_message = format_cart(cart, context)[0]
     courier_id = entry['5']
     context.bot.send_message(
             text=text_message,
@@ -247,21 +252,93 @@ def handle_delivery(update: Update, context: CallbackContext):
             text=f'Спасибо за заказ, будем ждать вам в ресторане {pizzeria_address} Возвращаю вас в меню.',
             chat_id=user_chat_id)
         start(update, context)
-        return "HANDLE_DESCRIPTION"
+        return "HANDLE_MENU"
     else:
+        start_with_shipping_callback(update, context)
+        return 'HANDLE_MENU'
 
-        lat = user_order['lat']
-        lon = user_order['lon']
-        context.bot.send_message(
-            text='Мы уже оповестили курьера, ждите ваш заказ! Возвращаю вас в меню.',
-            chat_id=update.effective_user.id)
-        create_customer_adreess(redis_conn, lat, lon)
-        entry = user_order['pizzeria_address']
-        send_the_order_to_the_courier(
-            update, context, entry, user_chat_id, lat, lon)
+
+def start_with_shipping_callback(update: Update, context: CallbackContext) -> None:
+    chat_id = update.effective_user.id
+    title = "Оплата пиццы"
+    description = "Оплата пиццы из ресторана DDOS PIZZA"
+    # select a payload just for you to recognize its the donation from your bot
+    payload = "Custom-Payload"
+    # In order to get a provider_token see https://core.telegram.org/bots/payments#getting-a-token
+    provider_token = os.getenv('TRANZZO_TOKEN')
+    start_parameter = "test-payment"
+    currency = "RUB"
+    # price in rubs
+    price_delivery = context.user_data.get("price_delivery")
+    pizza_cost = context.user_data.get("pizza_cost")
+    price = pizza_cost + price_delivery
+    # price * 100 so as to include 2 decimal points
+    # check https://core.telegram.org/bots/payments#supported-currencies for more details
+    prices = [LabeledPrice("Test", price * 100)]
+
+    # optionally pass need_name=True, need_phone_number=True,
+    # need_email=True, need_shipping_address=True, is_flexible=True
+    context.bot.send_invoice(
+        chat_id,
+        title,
+        description,
+        payload,
+        provider_token,
+        start_parameter,
+        currency,
+        prices,
+        need_name=True,
+        need_phone_number=True,
+        need_email=True,
+        need_shipping_address=True,
+        is_flexible=True,
+    )
+
+
+def shipping_callback(update: Update, context: CallbackContext) -> None:
+    query = update.shipping_query
+    # check the payload, is this from your bot?
+    if query.invoice_payload != 'Custom-Payload':
+        # answer False pre_checkout_query
+        query.answer(
+            ok=False, error_message="Что-то сломалось.")
+    options = list()
+    # a single LabeledPrice
+    options.append(ShippingOption('1', 'Shipping Option A', [LabeledPrice('A', 100)]))
+    # an array of LabeledPrice objects
+    price_list = [LabeledPrice('B1', 150), LabeledPrice('B2', 200)]
+    options.append(ShippingOption('2', 'Shipping Option B', price_list))
+    query.answer(ok=True, shipping_options=options)
+
+
+def precheckout_callback(update: Update, context: CallbackContext) -> None:
+    query = update.pre_checkout_query
+    # check the payload, is this from your bot?
+    if query.invoice_payload != 'Custom-Payload':
+        # answer False pre_checkout_query
+        query.answer(ok=False, error_message="ОШИБКА! Возвращаю в меню!")
         start(update, context)
-        context.job_queue.run_once(callback_alarm, 3600, context=user_chat_id, name=str(user_chat_id))
-        return 'HANDLE_DESCRIPTION'
+    else:
+        query.answer(ok=True)
+
+
+# finally, after contacting the payment provider...
+def successful_payment_callback(update: Update, context: CallbackContext) -> None:
+    # do something after successfully receiving payment?
+    user_chat_id = update.effective_user.id
+    context.bot.send_message(
+        text='Оплата успешно прошла! Отправили информацию курьеру!',
+        chat_id=user_chat_id)
+    user_order = context.user_data.get("user_order")
+    lat = user_order['lat']
+    lon = user_order['lon']
+    create_customer_adreess(redis_conn, lat, lon)
+    entry = user_order['pizzeria_address']
+    send_the_order_to_the_courier(
+        update, context, entry, user_chat_id, lat, lon)
+    start(update, context)
+    context.job_queue.run_once(
+        callback_alarm, 3600, context=user_chat_id, name=str(user_chat_id))
 
 
 def handle_waiting(update: Update, context: CallbackContext):
@@ -357,6 +434,7 @@ def handle_users_reply(update: Update, context: CallbackContext):
         'HANDLE_CART': handle_cart,
         'HANDLE_WAITING': handle_waiting,
         'HANDLE_DELIVERY': handle_delivery,
+        "PRECHECKOUT_CALLBACK": precheckout_callback,
     }
     state_handler = states_functions[user_state]
     next_state = state_handler(update, context)
@@ -379,6 +457,9 @@ def main():
     dispatcher.add_error_handler(error_handler)
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
+    dispatcher.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    dispatcher.add_handler(ShippingQueryHandler(shipping_callback))
+    dispatcher.add_handler(MessageHandler(Filters.successful_payment, successful_payment_callback))
     dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     updater.start_polling()
