@@ -14,7 +14,7 @@ from geopy import distance
 from motlin_api import (
     get_products, get_access_token, get_element_by_id,
     get_image_link, add_to_cart, get_cart, delete_from_cart,
-    get_all_entrys, create_an_entry)
+    get_all_entries, create_an_entry)
 from yandex_api import fetch_coordinates
 
 
@@ -24,17 +24,16 @@ def create_customer_adreess(redis_conn, lat, lon):
     data = {
         "data": {
             "type": "entry",
-            "1": lat,
-            "2": lon
+            "latitude": lat,
+            "longitude": lon
             }
         }
     create_an_entry(
-            access_token, data, 2)
+            access_token, data, "customer_address")
 
 
 def format_description(product_info):
     """Формотирует описание для пиццы"""
-
     name = product_info['name']
     description = product_info['description']
     price = product_info['meta']['display_price']['with_tax']['formatted']
@@ -51,7 +50,6 @@ def format_description(product_info):
 
 def format_cart(cart, context):
     """Форматирует корзину"""
-
     filtred_cart = []
     pizza_names = []
     pizza_ids = []
@@ -89,7 +87,6 @@ def format_cart(cart, context):
 
 def start(update: Update, context: CallbackContext):
     """Выводит все товары"""
-
     access_token = get_access_token(redis_conn)
     keyboard_product = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in get_products(access_token)]
@@ -105,7 +102,6 @@ def start(update: Update, context: CallbackContext):
 
 def handle_cart(update: Update, context: CallbackContext):
     """Показывает корзину"""
-
     access_token = get_access_token(redis_conn)
     chat_id = update.effective_user.id
     cart = get_cart(access_token, chat_id)
@@ -137,7 +133,6 @@ def handle_cart(update: Update, context: CallbackContext):
 
 def handle_description(update: Update, context: CallbackContext):
     """Отправляет по хэндлам"""
-
     query = update.callback_query
     query.answer()
     access_token = get_access_token(redis_conn)
@@ -175,20 +170,19 @@ def handle_description(update: Update, context: CallbackContext):
 
 def get_near_entry(current_pos, redis_conn):
     """Возвращает ближайщую пиццерию и расстояние до неё в км"""
-
     distances = []
     current_pos = [float(didgit) for didgit in current_pos]
     access_token = get_access_token(redis_conn)
 
-    entrys = get_all_entrys(access_token)['data']
-    for entry in entrys:
+    entries = get_all_entries(access_token)['data']
+    for entry in entries:
         distances.append(distance.distance(
-            (float(entry['3']), float(entry['4'])), current_pos).km)
+            (entry['latitude'], entry['longitude']), current_pos).km)
 
     min_distance = min(distances)
     index_near_entry = distances.index(min_distance)
 
-    return entrys[index_near_entry], min_distance
+    return entries[index_near_entry], min_distance
 
 
 def generate_message_dilivery(update, context, entry, min_distance):
@@ -197,7 +191,7 @@ def generate_message_dilivery(update, context, entry, min_distance):
             f'''\
             Может, заберете пиццу у нашей пиццерии неподалёку?
             Она всего в {int(min_distance*100)} метрах от вас!
-            Вот её адрес: {entry['1']}.
+            Вот её адрес: {entry['address']}.
 
             А можем доставить бесплатно нам не сложно!
             ''')
@@ -239,7 +233,7 @@ def send_the_order_to_the_courier(
     access_token = get_access_token(redis_conn)
     cart = get_cart(access_token, user_chat_id)
     text_message = format_cart(cart, context)[0]
-    courier_id = entry['5']
+    courier_id = entry['courier_id_telegram']
     context.bot.send_message(
             text=text_message,
             chat_id=courier_id)
@@ -275,7 +269,7 @@ def handle_delivery(update: Update, context: CallbackContext):
         return "HANDLE_DESCRIPTION"
 
     if user_answer == 'Самовывоз':
-        pizzeria_address = user_order['pizzeria_address']['1']
+        pizzeria_address = user_order['pizzeria_address']['address']
         context.bot.send_message(
             text=f'Спасибо за заказ, будем ждать вам в ресторане {pizzeria_address} Возвращаю вас в меню.',
             chat_id=user_chat_id)
@@ -375,8 +369,8 @@ def handle_waiting(update: Update, context: CallbackContext):
         else:
             message = update.message
         lat, lon = (message.location.latitude, message.location.longitude)
-
-    entry, min_distance = get_near_entry([lon, lat], redis_conn)
+    
+    entry, min_distance = get_near_entry([lat, lon], redis_conn)
     text_message, can_we_deliver = generate_message_dilivery(
         update, context, entry, min_distance)
     keyboard = [
