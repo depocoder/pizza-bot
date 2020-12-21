@@ -1,6 +1,6 @@
 import os
 import textwrap
-from pprint import pprint
+
 from loguru import logger
 from dotenv import load_dotenv
 from telegram import (
@@ -25,16 +25,20 @@ def create_customer_adreess(redis_conn, lat, lon):
         "data": {
             "type": "entry",
             "1": lat,
-            "2": lon}}
+            "2": lon
+            }
+        }
     create_an_entry(
             access_token, data, 2)
 
 
 def format_description(product_info):
     """Формотирует описание для пиццы"""
+
     name = product_info['name']
     description = product_info['description']
     price = product_info['meta']['display_price']['with_tax']['formatted']
+
     text_mess = (
         f'''\
         {name}
@@ -47,9 +51,11 @@ def format_description(product_info):
 
 def format_cart(cart, context):
     """Форматирует корзину"""
+
     filtred_cart = []
     pizza_names = []
     pizza_ids = []
+
     for pizza in cart['data']:
         filtred_cart.append({
             'name': pizza['name'],
@@ -57,12 +63,14 @@ def format_cart(cart, context):
             'price': pizza['meta']['display_price']['without_tax']['unit']['formatted'],
             'total': pizza['meta']['display_price']['without_tax']['value']['formatted'],
             'quantity': pizza['quantity']
-
         })
+
         pizza_names.append(pizza["name"])
         pizza_ids.append(pizza["id"])
+
     total_to_pay = cart['meta']['display_price']['without_tax']['amount']
     text_message = ''
+
     for pizza in filtred_cart:
         text_message += (
             f'''\
@@ -73,6 +81,7 @@ def format_cart(cart, context):
             {pizza['quantity']} пицц в корзине на сумму {pizza['total']}
 
             ''')
+
     context.user_data.update({"pizza_cost": total_to_pay})
     text_message += f'к оплате {total_to_pay}'
     return textwrap.dedent(text_message), pizza_names, pizza_ids
@@ -80,6 +89,7 @@ def format_cart(cart, context):
 
 def start(update: Update, context: CallbackContext):
     """Выводит все товары"""
+
     access_token = get_access_token(redis_conn)
     keyboard_product = [
         [InlineKeyboardButton(product['name'], callback_data=product['id'])] for product in get_products(access_token)]
@@ -95,9 +105,11 @@ def start(update: Update, context: CallbackContext):
 
 def handle_cart(update: Update, context: CallbackContext):
     """Показывает корзину"""
+
     access_token = get_access_token(redis_conn)
     chat_id = update.effective_user.id
     cart = get_cart(access_token, chat_id)
+
     keyboard = []
     keyboard.append([InlineKeyboardButton('В меню', callback_data='В меню')])
 
@@ -125,29 +137,35 @@ def handle_cart(update: Update, context: CallbackContext):
 
 def handle_description(update: Update, context: CallbackContext):
     """Отправляет по хэндлам"""
+
     query = update.callback_query
     query.answer()
     access_token = get_access_token(redis_conn)
     chat_id = update.effective_user.id
+
     if query.data == 'В меню':
         start(update, context)
         query.message.delete()
         return 'HANDLE_MENU'
+
     elif query.data == 'Корзина':
         handle_cart(update, context)
         query.message.delete()
         return "HANDLE_DESCRIPTION"
+
     elif query.data == 'Оплатить':
         query.message.delete()
         context.bot.send_message(
             text="Отправьте мне вашу локацию или адрес", chat_id=chat_id)
         return "HANDLE_WAITING"
+
     elif 'Убрать' in query.data:
         item_id = query.data.split("|")[1]
         delete_from_cart(access_token, item_id, chat_id)
         handle_cart(update, context)
         query.message.delete()
         return "HANDLE_DESCRIPTION"
+
     item_id = query.data
     add_to_cart(access_token, 1, item_id, chat_id)
     context.bot.send_message(
@@ -157,15 +175,19 @@ def handle_description(update: Update, context: CallbackContext):
 
 def get_near_entry(current_pos, redis_conn):
     """Возвращает ближайщую пиццерию и расстояние до неё в км"""
+
     distances = []
     current_pos = [float(didgit) for didgit in current_pos]
     access_token = get_access_token(redis_conn)
+
     entrys = get_all_entrys(access_token)['data']
     for entry in entrys:
         distances.append(distance.distance(
             (float(entry['3']), float(entry['4'])), current_pos).km)
+
     min_distance = min(distances)
     index_near_entry = distances.index(min_distance)
+
     return entrys[index_near_entry], min_distance
 
 
@@ -181,6 +203,7 @@ def generate_message_dilivery(update, context, entry, min_distance):
             ''')
         context.user_data.update({"price_delivery": 0})
         can_we_deliver = True
+
     elif min_distance <= 5:
         text_message = (
             '''\
@@ -189,6 +212,7 @@ def generate_message_dilivery(update, context, entry, min_distance):
             ''')
         can_we_deliver = True
         context.user_data.update({"price_delivery": 100})
+
     elif min_distance <= 20:
         text_message = (
             '''\
@@ -197,6 +221,7 @@ def generate_message_dilivery(update, context, entry, min_distance):
             ''')
         context.user_data.update({"price_delivery": 300})
         can_we_deliver = True
+
     else:
         text_message = (
             f'''\
@@ -204,6 +229,7 @@ def generate_message_dilivery(update, context, entry, min_distance):
             Ближайщая пиццерия аж в {round(min_distance)}километрах от вас!
             ''')
         can_we_deliver = False
+
     return textwrap.dedent(text_message), can_we_deliver
 
 
@@ -240,12 +266,14 @@ def handle_delivery(update: Update, context: CallbackContext):
     user_answer = query.data
     query.message.delete()
     user_order = context.user_data.get("user_order")
+
     if not user_order:
         context.bot.send_message(
             text='Произошла ошибка, возвращаю вас в корзину.',
             chat_id=user_chat_id)
         handle_cart(update, context)
         return "HANDLE_DESCRIPTION"
+
     if user_answer == 'Самовывоз':
         pizzeria_address = user_order['pizzeria_address']['1']
         context.bot.send_message(
@@ -253,6 +281,7 @@ def handle_delivery(update: Update, context: CallbackContext):
             chat_id=user_chat_id)
         start(update, context)
         return "HANDLE_MENU"
+
     else:
         start_with_shipping_callback(update, context)
         return 'HANDLE_MENU'
@@ -314,6 +343,7 @@ def successful_payment_callback(update: Update, context: CallbackContext) -> Non
     context.bot.send_message(
         text='Оплата успешно прошла! Отправили информацию курьеру!',
         chat_id=user_chat_id)
+
     user_order = context.user_data.get("user_order")
     lat = user_order['lat']
     lon = user_order['lon']
@@ -337,6 +367,7 @@ def handle_waiting(update: Update, context: CallbackContext):
                 text='Вы указали неправильно данные, попробуйте снова.',
                 chat_id=update.effective_user.id)
             return "HANDLE_WAITING"
+
     else:
         message = None
         if update.edited_message:
@@ -383,11 +414,13 @@ def handle_menu(update: Update, context: CallbackContext):
     if query.data == 'Корзина':
         handle_cart(update, context)
         return "HANDLE_DESCRIPTION"
+
     access_token = get_access_token(redis_conn)
     product_info = get_element_by_id(access_token, query.data)
     image_id = product_info['relationships']['main_image']['data']['id']
     text_mess = format_description(product_info)
     image_link = get_image_link(access_token, image_id)['data']['link']['href']
+
     keyboard = [
         [InlineKeyboardButton('В меню', callback_data='В меню')],
         [InlineKeyboardButton(
@@ -421,6 +454,7 @@ def handle_users_reply(update: Update, context: CallbackContext):
         'HANDLE_DELIVERY': handle_delivery,
         "PRECHECKOUT_CALLBACK": precheckout_callback,
     }
+
     state_handler = states_functions[user_state]
     next_state = state_handler(update, context)
     redis_conn.set(chat_id, next_state)
@@ -439,6 +473,7 @@ def main():
         port=os.getenv('REDIS_PORT'), db=0, decode_responses=True)
     updater = Updater(token=os.getenv("TG_TOKEN"), use_context=True)
     dispatcher = updater.dispatcher
+
     dispatcher.add_error_handler(error_handler)
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
@@ -447,6 +482,7 @@ def main():
     dispatcher.add_handler(MessageHandler(Filters.successful_payment, successful_payment_callback))
     dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+
     updater.start_polling()
 
 
