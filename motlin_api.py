@@ -107,11 +107,11 @@ def upload_file(access_token, image_path):
     headers = {
         'Authorization': f'Bearer {access_token}',
     }
-
-    files = {
-        'file': (image_path, open(image_path, 'rb')),
-        'public': (None, 'true'),
-    }
+    with open(image_path, 'rb') as my_file:
+        files = {
+            'file': (image_path, my_file),
+            'public': (None, 'true'),
+        }
 
     response = requests.post(
         'https://api.moltin.com/v2/files', headers=headers, files=files)
