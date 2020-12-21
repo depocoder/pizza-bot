@@ -4,9 +4,17 @@
 Этот проект позволяет создать своего телеграм бота для ресторанов пицц (Telegram). Этого бота еще нужно улучшать, стандарты MVP выполнены.
 Бот работает на [CMS](https://www.elasticpath.com/).    
      
+## Заполнение Flow
+Перед началом работы вам надо вручную создать Flow ваших пиццерий с `slug = 1`    
+И со всеми полями ниже, в этом же порядке `slug от 1 до 5`, обязательно укажите тип данных     
+`Address` тип данных str,	`Alias` тип данных str,	`Longitude` тип данных float,	`Latitude` тип данных float,	`courier id telegram` тип данных str         
+`courier id telegram` - Указывайте `Required Field` - `No`    
+Позже укажите id курьеров для всех ваших пиццерий    
+создать Flow для ваших покупателей с `slug = 2`     
+И со всеми полями ниже, в этом же порядке `slug от 1 до 2`     
+`Latitude` тип данных float, 	`Longitude` тип данных float    
       
-       
-## Подготовка к запуску Mac OS
+## Подготовка к запуску Mac OS    
 Сначала зарегестрируйтесь на [redis](https://redis.io/)     
 Уставновить [Python 3+](https://www.python.org/downloads/)
 
@@ -23,11 +31,14 @@ source env/bin/activate
 ```
 pip3 install -r requirements.txt
 ```
-
+Загрузка меню и адресов в CMS      
+```
+python3 upload.py       
+```
 Запуск бота   
 
 ```
-python3 vk_bot.py
+python3 tg_bot.py
 ```
 
 Создайте файл ".env" в него надо прописать ваши token'ы.   
