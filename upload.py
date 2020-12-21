@@ -62,17 +62,19 @@ def main():
     with open("addresses.json", "r", encoding='utf-8') as my_file:
         addresses = json.load(my_file)
     access_token = get_access_token(redis_conn)
-    flow_slug = "1"
+    flow_slug = "pizzeria"
     for entry in addresses:
         coordinates = entry['coordinates']
         #  Обязательно не забудьте создать Flow адресов, и поля для него!
         data = {
             "data": {
                 "type": "entry",
-                "1": entry['address']['full'],
-                "2": entry['alias'],
-                "3": coordinates['lon'],
-                "4": coordinates['lat']}}
+                "address": entry['address']['full'],
+                "alias": entry['alias'],
+                "latitude": coordinates['lat'],
+                "longitude": coordinates['lon'],
+                }
+            }
         create_an_entry(
             access_token, data, flow_slug)
 
