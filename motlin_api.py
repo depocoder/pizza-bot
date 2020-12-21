@@ -3,10 +3,10 @@ import os
 import requests
 
 
-def get_all_entrys(access_token):
+def get_all_entries(access_token):
 
     response = requests.get(
-        'https://api.moltin.com/v2/flows/1/entries',
+        'https://api.moltin.com/v2/flows/pizzeria/entries',
         headers={
             'Authorization': f'Bearer {access_token}',
             })
