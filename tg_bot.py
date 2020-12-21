@@ -168,21 +168,27 @@ def handle_description(update: Update, context: CallbackContext):
     return 'HANDLE_DESCRIPTION'
 
 
+def get_min_distance(distance):
+    return distance['distance']
+
+
 def get_near_entry(current_pos, redis_conn):
     """Возвращает ближайщую пиццерию и расстояние до неё в км"""
     distances = []
     current_pos = [float(didgit) for didgit in current_pos]
     access_token = get_access_token(redis_conn)
-
+    distances = []
     entries = get_all_entries(access_token)['data']
+
     for entry in entries:
-        distances.append(distance.distance(
-            (entry['latitude'], entry['longitude']), current_pos).km)
-
-    min_distance = min(distances)
-    index_near_entry = distances.index(min_distance)
-
-    return entries[index_near_entry], min_distance
+        distances.append({
+            "entry": entry,
+            "distance": distance.distance(
+                (entry['latitude'], entry['longitude']), current_pos).km
+                    }
+                        )
+    min_entry = min(distances, key=get_min_distance)
+    return min_entry['entry'], min_entry['distance']
 
 
 def generate_message_dilivery(update, context, entry, min_distance):
@@ -369,7 +375,7 @@ def handle_waiting(update: Update, context: CallbackContext):
         else:
             message = update.message
         lat, lon = (message.location.latitude, message.location.longitude)
-    
+
     entry, min_distance = get_near_entry([lat, lon], redis_conn)
     text_message, can_we_deliver = generate_message_dilivery(
         update, context, entry, min_distance)
