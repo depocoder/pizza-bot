@@ -55,13 +55,15 @@ def format_cart(cart, context):
     pizza_ids = []
 
     for pizza in cart['data']:
-        filtred_cart.append({
-            'name': pizza['name'],
-            "description": pizza['description'],
-            'price': pizza['meta']['display_price']['without_tax']['unit']['formatted'],
-            'total': pizza['meta']['display_price']['without_tax']['value']['formatted'],
-            'quantity': pizza['quantity']
-        })
+        filtred_cart.append(
+            {
+                'name': pizza['name'],
+                "description": pizza['description'],
+                'price': pizza['meta']['display_price']['without_tax']['unit']['formatted'],
+                'total': pizza['meta']['display_price']['without_tax']['value']['formatted'],
+                'quantity': pizza['quantity']
+                        }
+                    )
 
         pizza_names.append(pizza["name"])
         pizza_ids.append(pizza["id"])
@@ -70,15 +72,14 @@ def format_cart(cart, context):
     text_message = ''
 
     for pizza in filtred_cart:
-        text_message += (
-            f'''\
+        text_message += f'''\
 
-            {pizza["name"]}
-            {pizza['description']}
-            Стоимость пиццы {pizza['price']}
-            {pizza['quantity']} пицц в корзине на сумму {pizza['total']}
+                        {pizza["name"]}
+                        {pizza['description']}
+                        Стоимость пиццы {pizza['price']}
+                        {pizza['quantity']} пицц в корзине на сумму {pizza['total']}
 
-            ''')
+                        '''
 
     context.user_data.update({"pizza_cost": total_to_pay})
     text_message += f'к оплате {total_to_pay}'
@@ -175,7 +176,6 @@ def get_min_distance(distance):
 def get_near_entry(current_pos, redis_conn):
     """Возвращает ближайщую пиццерию и расстояние до неё в км"""
     distances = []
-    current_pos = [float(didgit) for didgit in current_pos]
     access_token = get_access_token(redis_conn)
     distances = []
     entries = get_all_entries(access_token)['data']
@@ -244,7 +244,10 @@ def send_the_order_to_the_courier(
             text=text_message,
             chat_id=courier_id)
     context.bot.send_location(
-            latitude=lat, longitude=lon, chat_id=courier_id)
+            latitude=lat,
+            longitude=lon,
+            chat_id=courier_id
+            )
 
 
 def callback_alarm(context):
@@ -287,7 +290,7 @@ def handle_delivery(update: Update, context: CallbackContext):
         return 'HANDLE_MENU'
 
 
-def start_with_shipping_callback(update: Update, context: CallbackContext) -> None:
+def start_with_shipping_callback(update: Update, context: CallbackContext):
     chat_id = update.effective_user.id
     title = "Оплата пиццы"
     description = "Оплата пиццы из ресторана DDOS PIZZA"
@@ -317,7 +320,7 @@ def start_with_shipping_callback(update: Update, context: CallbackContext) -> No
     )
 
 
-def shipping_callback(update: Update, context: CallbackContext) -> None:
+def shipping_callback(update: Update, context: CallbackContext):
     query = update.shipping_query
     if query.invoice_payload != 'Custom-Payload':
         query.answer(
@@ -329,7 +332,7 @@ def shipping_callback(update: Update, context: CallbackContext) -> None:
     query.answer(ok=True, shipping_options=options)
 
 
-def precheckout_callback(update: Update, context: CallbackContext) -> None:
+def precheckout_callback(update: Update, context: CallbackContext):
     query = update.pre_checkout_query
     if query.invoice_payload != 'Custom-Payload':
         query.answer(ok=False, error_message="ОШИБКА! Возвращаю в меню!")
@@ -338,7 +341,7 @@ def precheckout_callback(update: Update, context: CallbackContext) -> None:
         query.answer(ok=True)
 
 
-def successful_payment_callback(update: Update, context: CallbackContext) -> None:
+def successful_payment_callback(update: Update, context: CallbackContext):
     user_chat_id = update.effective_user.id
     context.bot.send_message(
         text='Оплата успешно прошла! Отправили информацию курьеру!',
@@ -361,6 +364,7 @@ def handle_waiting(update: Update, context: CallbackContext):
         try:
             current_pos = fetch_coordinates(
                 os.getenv('YANDEX_GEOCODER'), update.message.text)
+            current_pos = [float(didgit) for didgit in current_pos]
             lon, lat = current_pos
         except IndexError:
             context.bot.send_message(
