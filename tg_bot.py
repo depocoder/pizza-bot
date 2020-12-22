@@ -61,8 +61,7 @@ def format_cart(cart, context):
                 'price': pizza['meta']['display_price']['without_tax']['unit']['formatted'],
                 'total': pizza['meta']['display_price']['without_tax']['value']['formatted'],
                 'quantity': pizza['quantity']
-                        }
-                    )
+            })
 
         pizza_names.append(pizza["name"])
         pizza_ids.append(pizza["id"])
@@ -202,7 +201,6 @@ def generate_message_dilivery(update, context, entry, min_distance):
 
     elif min_distance <= 5:
         text_message = '''\
-            
                         Похоже ехать до вас придется на самокате.
                         Доставка будет стоить 100р. Доставляем или самовывоз?
                         '''
