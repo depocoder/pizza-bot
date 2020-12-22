@@ -38,13 +38,12 @@ def format_description(product_info):
     description = product_info['description']
     price = product_info['meta']['display_price']['with_tax']['formatted']
 
-    text_mess = (
-        f'''\
-        {name}
-        Стоимость: {price}
+    text_mess = f'''\
+                {name}
+                Стоимость: {price}
 
-        {description}
-        ''')
+                {description}
+                '''
     return textwrap.dedent(text_mess)
 
 
@@ -169,10 +168,6 @@ def handle_description(update: Update, context: CallbackContext):
     return 'HANDLE_DESCRIPTION'
 
 
-def get_min_distance(distance):
-    return distance['distance']
-
-
 def get_near_entry(current_pos, redis_conn):
     """Возвращает ближайщую пиццерию и расстояние до неё в км"""
     distances = []
@@ -187,20 +182,22 @@ def get_near_entry(current_pos, redis_conn):
                 (entry['latitude'], entry['longitude']), current_pos).km
                     }
                         )
-    min_entry = min(distances, key=get_min_distance)
+    min_entry = min(
+        distances,
+        key=lambda distance: distance['distance'])
     return min_entry['entry'], min_entry['distance']
 
 
 def generate_message_dilivery(update, context, entry, min_distance):
     if min_distance <= 0.5:
-        text_message = (
-            f'''\
-            Может, заберете пиццу у нашей пиццерии неподалёку?
-            Она всего в {int(min_distance*100)} метрах от вас!
-            Вот её адрес: {entry['address']}.
+        text_message = f'''\
+            
+                        Может, заберете пиццу у нашей пиццерии неподалёку?
+                        Она всего в {int(min_distance*100)} метрах от вас!
+                        Вот её адрес: {entry['address']}.
 
-            А можем доставить бесплатно нам не сложно!
-            ''')
+                        А можем доставить бесплатно нам не сложно!
+                        '''
         context.user_data.update({"price_delivery": 0})
         can_we_deliver = True
 
@@ -214,20 +211,19 @@ def generate_message_dilivery(update, context, entry, min_distance):
         context.user_data.update({"price_delivery": 100})
 
     elif min_distance <= 20:
-        text_message = (
-            '''\
-            Похоже ехать до вас придется на самокате.
-            Доставка будет стоить 300р. Доставляем или самовывоз?
-            ''')
+        text_message = '''\
+            
+                        Похоже ехать до вас придется на самокате.
+                        Доставка будет стоить 300р. Доставляем или самовывоз?
+                        '''
         context.user_data.update({"price_delivery": 300})
         can_we_deliver = True
 
     else:
-        text_message = (
-            f'''\
-            Простите, но вы слишком далеко мы пиццу не доставим.
-            Ближайщая пиццерия аж в {round(min_distance)}километрах от вас!
-            ''')
+        text_message = f'''\
+                        Простите, но вы слишком далеко мы пиццу не доставим.
+                        Ближайщая пиццерия аж в {round(min_distance)}километрах от вас!
+                        '''
         can_we_deliver = False
 
     return textwrap.dedent(text_message), can_we_deliver
@@ -252,12 +248,12 @@ def send_the_order_to_the_courier(
 
 def callback_alarm(context):
     job = context.job
-    text_message = (
-        '''\
-        Приятного аппетита! *место для рекламы*
+    text_message = '''\
+        
+                    Приятного аппетита! *место для рекламы*
 
-        *сообщение что делать если пицца не пришла*
-        ''')
+                    *сообщение что делать если пицца не пришла*
+                    '''
     text_message = textwrap.dedent(text_message)
     context.bot.send_message(chat_id=job.context, text=text_message)
 
