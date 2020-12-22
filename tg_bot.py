@@ -191,7 +191,6 @@ def get_near_entry(current_pos, redis_conn):
 def generate_message_dilivery(update, context, entry, min_distance):
     if min_distance <= 0.5:
         text_message = f'''\
-            
                         Может, заберете пиццу у нашей пиццерии неподалёку?
                         Она всего в {int(min_distance*100)} метрах от вас!
                         Вот её адрес: {entry['address']}.
@@ -202,17 +201,16 @@ def generate_message_dilivery(update, context, entry, min_distance):
         can_we_deliver = True
 
     elif min_distance <= 5:
-        text_message = (
-            '''\
-            Похоже ехать до вас придется на самокате.
-            Доставка будет стоить 100р. Доставляем или самовывоз?
-            ''')
+        text_message = '''\
+            
+                        Похоже ехать до вас придется на самокате.
+                        Доставка будет стоить 100р. Доставляем или самовывоз?
+                        '''
         can_we_deliver = True
         context.user_data.update({"price_delivery": 100})
 
     elif min_distance <= 20:
         text_message = '''\
-            
                         Похоже ехать до вас придется на самокате.
                         Доставка будет стоить 300р. Доставляем или самовывоз?
                         '''
