@@ -5,14 +5,12 @@
 Бот работает на [CMS](https://www.elasticpath.com/).    
      
 ## Заполнение Flow
-Перед началом работы вам надо вручную создать Flow ваших пиццерий с `slug = 1`    
-И со всеми полями ниже, в этом же порядке `slug от 1 до 5`, обязательно укажите тип данных     
-`Address` тип данных str,	`Alias` тип данных str,	`Longitude` тип данных float,	`Latitude` тип данных float,	`courier id telegram` тип данных str         
-`courier id telegram` - Указывайте `Required Field` - `No`    
-Позже укажите id курьеров для всех ваших пиццерий    
-создать Flow для ваших покупателей с `slug = 2`     
-И со всеми полями ниже, в этом же порядке `slug от 1 до 2`     
-`Latitude` тип данных float, 	`Longitude` тип данных float    
+Перед началом работы вам надо вручную создать Flow ваших пиццерий с `slug = pizzeria` указанным ниже.   
+Дальше создаете поля для Flow. Поля указаны в формате `slug - тип данных`.     
+`address` - str,	`alias` - str,	`Longitude` - float,	`Latitude` - float,	`courier_id_telegram` - str         
+`courier_id_telegram` - Указывайте `Required Field` - `No`. Позже укажите id курьеров для всех ваших пиццерий в этом поле.    
+создать Flow для ваших покупателей с `slug = customer_address`          
+`latitude` - float, 	`longitude` - float    
       
 ## Подготовка к запуску Mac OS    
 Сначала зарегестрируйтесь на [redis](https://redis.io/)     
