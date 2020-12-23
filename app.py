@@ -3,7 +3,7 @@ import sys
 import json
 from datetime import datetime
 from dotenv import load_dotenv
-
+from loguru import logger
 import requests
 from flask import Flask, request
 
@@ -36,8 +36,62 @@ def webhook():
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
                     recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
                     message_text = messaging_event["message"]["text"]  # the message's text
+                    send_keyboard(recipient_id, message_text)
                     send_message(sender_id, message_text)
     return "ok", 200
+
+
+@logger.catch
+def send_keyboard(recipient_id, message_text):
+    params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
+    headers = {"Content-Type": "application/json"}
+    data = {
+
+        {"recipient": {
+            "id": recipient_id
+            },
+         "message": {
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "generic",
+                    "elements": [{
+                        "title": "Welcome!",
+                        "image_url": "https://petersfancybrownhats.com/company_image.png",
+                        "subtitle": "We have the right hat for everyone.",
+                        "default_action": {
+                            "type": "web_url",
+                            "url": "https://petersfancybrownhats.com/view?item': '103",
+                            "messenger_extensions": False,
+                            "webview_height_ratio": "tall",
+                            "fallback_url": "https://petersfancybrownhats.com/"
+                            },
+                        "buttons": [
+                            {
+                                "type": "web_url",
+                                "url": "https://petersfancybrownhats.com",
+                                "title": "View Website"
+                                },
+                            {
+                                "type": "postback",
+                                "title": "Start Chatting",
+                                "payload": "DEVELOPER_DEFINED_PAYLOAD"
+                                }
+                            ]
+                        }]
+                    }
+                }
+            }
+        }
+    }
+    data = json.dumps(data)
+    response = requests.post(
+        'https://graph.facebook.com/v2.6/me/messages',
+        headers=headers,
+        params=params,
+        data=(data)
+        )
+    response.raise_for_status()
 
 
 def send_message(recipient_id, message_text):
