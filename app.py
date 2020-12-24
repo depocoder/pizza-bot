@@ -1,11 +1,16 @@
 import os
 import sys
 import json
+import redis
+
+from pprint import pprint
 from datetime import datetime
 from dotenv import load_dotenv
 from loguru import logger
 import requests
 from flask import Flask, request
+
+from motlin_api import get_access_token, get_products
 
 app = Flask(__name__)
 
@@ -36,61 +41,71 @@ def webhook():
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
                     recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
                     message_text = messaging_event["message"]["text"]  # the message's text
-                    send_keyboard(recipient_id, message_text)
+                    send_keyboard(sender_id)
                     send_message(sender_id, message_text)
     return "ok", 200
 
 
-@logger.catch
-def send_keyboard(recipient_id, message_text):
+def send_keyboard(recipient_id):
     params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
-    data = {
-
-        {"recipient": {
+    access_token = get_access_token(redis_conn)
+    keyboard_product = [
+        {
+            'type': 'postback',
+            'title': product["name"],
+            'payload': 1,
+        } for product in get_products(access_token)[:2]]
+    pprint(keyboard_product)
+    data = json.dumps({
+        'recipient': {
             "id": recipient_id
-            },
-         "message": {
-            "attachment": {
-                "type": "template",
-                "payload": {
-                    "template_type": "generic",
-                    "elements": [{
-                        "title": "Welcome!",
-                        "image_url": "https://petersfancybrownhats.com/company_image.png",
-                        "subtitle": "We have the right hat for everyone.",
-                        "default_action": {
-                            "type": "web_url",
-                            "url": "https://petersfancybrownhats.com/view?item': '103",
-                            "messenger_extensions": False,
-                            "webview_height_ratio": "tall",
-                            "fallback_url": "https://petersfancybrownhats.com/"
+        },
+        'message': {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'generic',
+                    'elements': [
+                        {
+                            'title': 'Welocome!',
+                            'image_url': 'https://petersfancybrownhats.com/company_image.png',
+                            'subtitle': 'We have the right hat for everyone.',
+                            'default_action': {
+                                'type': 'web_url',
+                                'url': 'https://petersfancybrownhats.com/view?item=103',
+                                'messenger_extensions': True,
+                                'webview_height_ratio': 'tall',
+                                'fallback_url': 'https://petersfancybrownhats.com/',
                             },
-                        "buttons": [
-                            {
-                                "type": "web_url",
-                                "url": "https://petersfancybrownhats.com",
-                                "title": "View Website"
-                                },
-                            {
-                                "type": "postback",
-                                "title": "Start Chatting",
-                                "payload": "DEVELOPER_DEFINED_PAYLOAD"
+                            'buttons': [
+                                {
+                                    'type': 'web_url',
+                                    'url': 'https://instagram.com',
+                                    'title': 'View Website',
+                                }, {
+                                    'type': 'postback',
+                                    'title': 'Start Chatting',
+                                    'payload': 'DEVELOPER_DEFINED_PAYLOAD'
                                 }
                             ]
-                        }]
-                    }
+                        }, {
+                            'title': 'Swipe left/right for more options.',
+                            'buttons': keyboard_product
+                        }
+                    ]
                 }
             }
         }
-    }
-    data = json.dumps(data)
+    })
+    pprint(data)
     response = requests.post(
         'https://graph.facebook.com/v2.6/me/messages',
         headers=headers,
         params=params,
-        data=(data)
+        data=data
         )
+    print(response.json())
     response.raise_for_status()
 
 
@@ -108,6 +123,17 @@ def send_message(recipient_id, message_text):
     response = requests.post("https://graph.facebook.com/v2.6/me/messages", params=params, headers=headers, data=request_content)
     response.raise_for_status()
 
-if __name__ == '__main__':
+
+@logger.catch
+def main():
     load_dotenv()
+    global redis_conn
+    redis_conn = redis.Redis(
+        host=os.getenv('REDIS_HOST'), password=os.getenv('REDIS_PASSWORD'),
+        port=os.getenv('REDIS_PORT'), db=0, decode_responses=True)
     app.run(debug=True, host='0.0.0.0', port=80)
+
+
+
+if __name__ == '__main__':
+    main()
