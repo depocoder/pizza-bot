@@ -3,14 +3,41 @@ import os
 import requests
 
 
-def get_all_entries(access_token):
+def get_access_token(redis_conn):
+    access_token = redis_conn.get('access_token')
+    if not access_token:
+        data = {
+            'client_id': os.getenv('MOTLIN_CLIENT_ID'),
+            'client_secret': os.getenv('MOTLIN_CLIENT_SECRET'),
+            'grant_type': 'client_credentials',
+                }
+        response = requests.get('https://api.moltin.com/oauth/access_token',
+                                data=data)
+        response.raise_for_status()
+        token_info = response.json()
+        time_to_expire_s = token_info['expires_in']
+        access_token = token_info['access_token']
+        redis_conn.set('access_token', access_token, ex=time_to_expire_s)
+    return access_token
 
+
+def get_all_entries(access_token):
     response = requests.get(
         'https://api.moltin.com/v2/flows/pizzeria/entries',
         headers={
             'Authorization': f'Bearer {access_token}',
             })
 
+    response.raise_for_status()
+    return response.json()
+
+
+def get_all_categories(access_token):
+    response = requests.get(
+        'https://api.moltin.com/v2/categories',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            })
     response.raise_for_status()
     return response.json()
 
@@ -29,24 +56,6 @@ def get_products_by_category_id(access_token, category_id):
         params=params)
     response.raise_for_status()
     return response.json()
-
-
-def get_access_token(redis_conn):
-    access_token = redis_conn.get('access_token')
-    if not access_token:
-        data = {
-            'client_id': os.getenv('MOTLIN_CLIENT_ID'),
-            'client_secret': os.getenv('MOTLIN_CLIENT_SECRET'),
-            'grant_type': 'client_credentials',
-                }
-        response = requests.get('https://api.moltin.com/oauth/access_token',
-                                data=data)
-        response.raise_for_status()
-        token_info = response.json()
-        time_to_expire_s = token_info['expires_in']
-        access_token = token_info['access_token']
-        redis_conn.set('access_token', access_token, ex=time_to_expire_s)
-    return access_token
 
 
 def create_product(access_token, name, description, price, id_pizza):
