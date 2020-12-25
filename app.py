@@ -1,10 +1,8 @@
 import os
-import sys
 import json
 import redis
 
 from pprint import pprint
-from datetime import datetime
 from dotenv import load_dotenv
 from loguru import logger
 import requests
@@ -12,7 +10,7 @@ from flask import Flask, request
 
 from motlin_api import (
     get_access_token, get_products, get_image_link,
-    get_products_by_category_id)
+    get_products_by_category_id, get_all_categories)
 
 app = Flask(__name__)
 
@@ -49,7 +47,7 @@ def webhook():
 
 
 def get_keyboard_products(category_id):
-    keyboard_elements = [{ 
+    keyboard_elements = [{
                 'title': 'Меню',
                 'subtitle': "Здесь вы можете выбрать один из вариантов",
                 'image_url': 'https://image.similarpng.com/very-thumbnail/2020/05/Pizza-logo-design-template-Vector-PNG.png',
@@ -91,6 +89,21 @@ def get_keyboard_products(category_id):
                 ]
             }
         )
+    
+    categories = get_all_categories(access_token)['data']
+    keyboard_elements.append(
+            {
+                'title': 'Не нашли нужную пиццу?',
+                'subtitle': 'Остальные пиццы можно посмотреть в одной из категории',
+                'image_url': 'https://primepizza.ru/uploads/position/large_0c07c6fd5c4dcadddaf4a2f1a2c218760b20c396.jpg',
+                'buttons': [
+                    {
+                        'type': 'postback',
+                        'title': category['name'],
+                        'payload': category['id'],
+                    } for category in categories if category['name'] != 'Основные']
+            }
+    )
     return keyboard_elements
 
 
