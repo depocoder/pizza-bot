@@ -50,13 +50,19 @@ def send_keyboard(recipient_id):
     params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
     access_token = get_access_token(redis_conn)
-    keyboard_product = [
-        {
-            'type': 'postback',
-            'title': product["name"],
-            'payload': 1,
-        } for product in get_products(access_token)[:2]]
-    pprint(keyboard_product)
+    keyboard_elements = [
+        {   
+            'title': product['name'] + ' ' + product['meta']['display_price']['with_tax']['formatted'],
+            'subtitle': product['description'],
+            'buttons': [
+                {
+                    'type': 'postback',
+                    'title': 'Положить в корзину',
+                    'payload': product['id'],
+                }
+            ]
+        } for product in get_products(access_token)[:5]]
+    pprint(keyboard_elements)
     data = json.dumps({
         'recipient': {
             "id": recipient_id
@@ -66,34 +72,7 @@ def send_keyboard(recipient_id):
                 'type': 'template',
                 'payload': {
                     'template_type': 'generic',
-                    'elements': [
-                        {
-                            'title': 'Welocome!',
-                            'image_url': 'https://petersfancybrownhats.com/company_image.png',
-                            'subtitle': 'We have the right hat for everyone.',
-                            'default_action': {
-                                'type': 'web_url',
-                                'url': 'https://petersfancybrownhats.com/view?item=103',
-                                'messenger_extensions': True,
-                                'webview_height_ratio': 'tall',
-                                'fallback_url': 'https://petersfancybrownhats.com/',
-                            },
-                            'buttons': [
-                                {
-                                    'type': 'web_url',
-                                    'url': 'https://instagram.com',
-                                    'title': 'View Website',
-                                }, {
-                                    'type': 'postback',
-                                    'title': 'Start Chatting',
-                                    'payload': 'DEVELOPER_DEFINED_PAYLOAD'
-                                }
-                            ]
-                        }, {
-                            'title': 'Swipe left/right for more options.',
-                            'buttons': keyboard_product
-                        }
-                    ]
+                    'elements': keyboard_elements
                 }
             }
         }
