@@ -16,15 +16,16 @@ from motlin_api import (
 app = Flask(__name__)
 
 
-def handle_start(sender_id, message_text):
-    send_keyboard(sender_id)
+def handle_start(sender_id, message_text, payload):
+    send_keyboard(sender_id, payload)
     return "START"
 
 
-def handle_users_reply(sender_id, message_text):
+def handle_users_reply(sender_id, message_text, payload):
     states_functions = {
         'START': handle_start,
     }
+
     recorded_state = redis_conn.get(f"fb-{sender_id}")
     if recorded_state not in states_functions.keys():
         user_state = "START"
@@ -33,7 +34,7 @@ def handle_users_reply(sender_id, message_text):
     if message_text == "/start":
         user_state = "START"
     state_handler = states_functions[user_state]
-    next_state = state_handler(sender_id, message_text)
+    next_state = state_handler(sender_id, message_text, payload)
     redis_conn.set(f"fb-{sender_id}", next_state)
 
 
@@ -46,11 +47,16 @@ def webhook():
     if data["object"] == "page":
         for entry in data["entry"]:
             for messaging_event in entry["messaging"]:
-                if messaging_event.get("message"):  # someone sent us a message
+                postback = messaging_event.get("postback")
+                if postback:
+                    payload = postback['payload']
+                else:
+                    payload = None
+                if messaging_event.get("message") or postback:  # someone sent us a message
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
                     recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
-                    message_text = messaging_event["message"]["text"]  # the message's text
-                    handle_users_reply(sender_id, message_text)
+                    message_text = ' '  # the message's text
+                    handle_users_reply(sender_id, message_text, payload)
     return "ok", 200
 
 
@@ -122,17 +128,18 @@ def get_keyboard_products(category_id):
                         'type': 'postback',
                         'title': category['name'],
                         'payload': category['id'],
-                    } for category in categories if category['name'] != 'Основные']
+                    } for category in categories if category['id'] != category_id]
             }
     )
     return keyboard_elements
 
 
-def send_keyboard(recipient_id):
+def send_keyboard(recipient_id, payload):
     params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
-
-    keyboard_elements = get_keyboard_products("68ff879e-9b22-4cab-ab32-23cac76a40d9")
+    if payload is None:
+        payload = '68ff879e-9b22-4cab-ab32-23cac76a40d9'
+    keyboard_elements = get_keyboard_products(payload)
     data = json.dumps({
         'recipient': {
             "id": recipient_id
