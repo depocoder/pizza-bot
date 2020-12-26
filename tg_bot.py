@@ -439,7 +439,7 @@ def handle_users_reply(update: Update, context: CallbackContext):
     if user_reply == '/start':
         user_state = 'START'
     else:
-        user_state = redis_conn.get(chat_id)
+        user_state = redis_conn.get(f"tg-{chat_id}")
 
     states_functions = {
         'START': start,
@@ -453,7 +453,7 @@ def handle_users_reply(update: Update, context: CallbackContext):
 
     state_handler = states_functions[user_state]
     next_state = state_handler(update, context)
-    redis_conn.set(chat_id, next_state)
+    redis_conn.set(f"tg-{chat_id}", next_state)
 
 
 def error_handler(update: Update, context: CallbackContext):
