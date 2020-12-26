@@ -9,23 +9,32 @@ import requests
 from flask import Flask, request
 
 from motlin_api import (
-    get_access_token, get_products, get_image_link,
+    get_access_token, get_image_link,
     get_products_by_category_id, get_all_categories)
+
 
 app = Flask(__name__)
 
 
-@app.route('/', methods=['GET'])
-def verify():
-    """
-    При верификации вебхука у Facebook он отправит запрос на этот адрес. На него нужно ответить VERIFY_TOKEN.
-    """
-    if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.challenge"):
-        if not request.args.get("hub.verify_token") == os.getenv("VERIFY_TOKEN"):
-            return "Verification token mismatch", 403
-        return request.args["hub.challenge"], 200
+def handle_start(sender_id, message_text):
+    send_keyboard(sender_id)
+    return "START"
 
-    return "Hello world", 200
+
+def handle_users_reply(sender_id, message_text):
+    states_functions = {
+        'START': handle_start,
+    }
+    recorded_state = redis_conn.get(f"fb-{sender_id}")
+    if recorded_state not in states_functions.keys():
+        user_state = "START"
+    else:
+        user_state = recorded_state
+    if message_text == "/start":
+        user_state = "START"
+    state_handler = states_functions[user_state]
+    next_state = state_handler(sender_id, message_text)
+    redis_conn.set(f"fb-{sender_id}", next_state)
 
 
 @app.route('/', methods=['POST'])
@@ -41,9 +50,21 @@ def webhook():
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
                     recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
                     message_text = messaging_event["message"]["text"]  # the message's text
-                    send_keyboard(sender_id)
-                    send_message(sender_id, message_text)
+                    handle_users_reply(sender_id, message_text)
     return "ok", 200
+
+
+@app.route('/', methods=['GET'])
+def verify():
+    """
+    При верификации вебхука у Facebook он отправит запрос на этот адрес. На него нужно ответить VERIFY_TOKEN.
+    """
+    if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.challenge"):
+        if not request.args.get("hub.verify_token") == os.getenv("VERIFY_TOKEN"):
+            return "Verification token mismatch", 403
+        return request.args["hub.challenge"], 200
+
+    return "Hello world", 200
 
 
 def get_keyboard_products(category_id):
