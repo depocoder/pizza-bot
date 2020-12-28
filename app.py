@@ -11,19 +11,136 @@ from flask import Flask, request
 from motlin_api import (
     get_access_token, get_image_link,
     get_products_by_category_id, get_all_categories)
-
+from motlin_api import (
+    get_products, get_access_token, get_element_by_id,
+    get_image_link, add_to_cart, get_cart, delete_from_cart,
+    get_all_entries, create_an_entry)
 
 app = Flask(__name__)
 
 
-def handle_start(sender_id, message_text, payload):
-    send_keyboard(sender_id, payload)
-    return "START"
+def handle_start(sender_id, payload):
+    if payload is None:
+        payload = '68ff879e-9b22-4cab-ab32-23cac76a40d9'
+    keyboard_elements = get_keyboard_products(sender_id, payload)
+    pprint(keyboard_elements)
+    send_keyboard(sender_id, keyboard_elements)
+    return "HANDLE_DESCRIPTION"
 
 
-def handle_users_reply(sender_id, message_text, payload):
+def handle_description(sender_id, payload):
+    """Отправляет по хэндлам"""
+    if payload is not None:
+        title = payload['title']
+        payload = payload['payload']
+    else:
+        title, payload = None, None
+    access_token = get_access_token(redis_conn)
+
+    if title in ['В меню', 'Сытные', 'Основные']:
+        handle_start(sender_id, payload)
+        return 'HANDLE_DESCRIPTION'
+
+    elif title == 'Корзина':
+        handle_cart(sender_id, payload)
+        return "HANDLE_DESCRIPTION"
+
+    elif title in ['Оплатить', 'Доставка', 'Самовывоз']:
+        send_message(sender_id, "Эта функция пока не доступна!")
+        return "HANDLE_WAITING"
+
+    elif title == 'Убрать из корзины':
+        delete_from_cart(access_token, payload, sender_id)
+        handle_cart(sender_id, payload)
+        return "HANDLE_DESCRIPTION"
+    elif title in ['Положить в корзину', 'Добавить еще одну']:
+        send_message(sender_id, f"Добавлена payload - {title}{payload}")
+        add_to_cart(access_token, 1, payload, sender_id)
+        return 'HANDLE_DESCRIPTION'
+    return 'HANDLE_DESCRIPTION'
+    
+
+
+def format_cart(cart):
+    """Форматирует корзину"""
+    keyboard_cart = []
+    for pizza in cart['data']:
+        pprint(pizza)
+        keyboard_cart.append(
+            {
+                'title': pizza['name'],
+                'subtitle': pizza['description'],
+                'image_url': pizza['image']['href'],
+                'buttons': [
+                    {
+                        'type': 'postback',
+                        'title': 'Добавить еще одну',
+                        'payload': pizza["id"],
+                    },
+                    {
+                        'type': 'postback',
+                        'title': 'Убрать из корзины',
+                        'payload': pizza["id"],
+                    }
+                ]
+            })
+
+    total_to_pay = cart['meta']['display_price']['without_tax']['amount']
+    return keyboard_cart, total_to_pay
+
+
+def handle_cart(sender_id, payload):
+    """Показывает корзину"""
+    access_token = get_access_token(redis_conn)
+    cart = get_cart(access_token, sender_id)
+
+    if not cart['data']:
+        send_keyboard(
+            sender_id,
+            {
+                'title': "Ваша корзина пуста :C",
+                'buttons': [
+                    {
+                        'type': 'postback',
+                        'title': 'В меню',
+                        'payload': "68ff879e-9b22-4cab-ab32-23cac76a40d9",
+                    },
+                ]
+            })
+        return "HANDLE_DESCRIPTION"
+    keyboard_cart, total_to_pay = format_cart(cart)
+    keyboard_elements = [
+        {
+                'title': f"Ваш заказ на сумму {total_to_pay}",
+                'image_url': 'https://internet-marketings.ru/wp-content/uploads/2018/08/idealnaya-korzina-internet-magazina-1068x713.jpg',
+                'buttons': [
+                    {
+                        'type': 'postback',
+                        'title': 'Доставка',
+                        'payload': 'Кнопка не работает',
+                    },
+                    {
+                        'type': 'postback',
+                        'title': 'Самовывоз',
+                        'payload': 'Кнопка не работает',
+                    },
+                    {
+                        'type': 'postback',
+                        'title': 'В меню',
+                        'payload': "68ff879e-9b22-4cab-ab32-23cac76a40d9",
+                    },
+                ]
+        }
+    ]
+    keyboard_elements += keyboard_cart
+    send_keyboard(sender_id, keyboard_elements)
+    return "HANDLE_DESCRIPTION"
+
+
+def handle_users_reply(sender_id, payload):
     states_functions = {
         'START': handle_start,
+        'HANDLE_DESCRIPTION': handle_description,
     }
 
     recorded_state = redis_conn.get(f"fb-{sender_id}")
@@ -31,10 +148,9 @@ def handle_users_reply(sender_id, message_text, payload):
         user_state = "START"
     else:
         user_state = recorded_state
-    if message_text == "/start":
-        user_state = "START"
+
     state_handler = states_functions[user_state]
-    next_state = state_handler(sender_id, message_text, payload)
+    next_state = state_handler(sender_id, payload)
     redis_conn.set(f"fb-{sender_id}", next_state)
 
 
@@ -49,14 +165,15 @@ def webhook():
             for messaging_event in entry["messaging"]:
                 postback = messaging_event.get("postback")
                 if postback:
-                    payload = postback['payload']
+                    pprint(postback)
+                    payload = {}
+                    payload['payload'] = postback['payload']
+                    payload['title'] = postback['title']
                 else:
                     payload = None
                 if messaging_event.get("message") or postback:  # someone sent us a message
                     sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
-                    recipient_id = messaging_event["recipient"]["id"]  # the recipient's ID, which should be your page's facebook ID
-                    message_text = ' '  # the message's text
-                    handle_users_reply(sender_id, message_text, payload)
+                    handle_users_reply(sender_id, payload)
     return "ok", 200
 
 
@@ -73,7 +190,7 @@ def verify():
     return "Hello world", 200
 
 
-def get_keyboard_products(category_id):
+def get_keyboard_products(sender_id, category_id):
     keyboard_elements = [{
                 'title': 'Меню',
                 'subtitle': "Здесь вы можете выбрать один из вариантов",
@@ -82,7 +199,7 @@ def get_keyboard_products(category_id):
                     {
                         'type': 'postback',
                         'title': 'Корзина',
-                        'payload': 'some text',
+                        'payload': sender_id,
                     },
                     {
                         'type': 'postback',
@@ -116,7 +233,7 @@ def get_keyboard_products(category_id):
                 ]
             }
         )
-    
+
     categories = get_all_categories(access_token)['data']
     keyboard_elements.append(
             {
@@ -134,15 +251,13 @@ def get_keyboard_products(category_id):
     return keyboard_elements
 
 
-def send_keyboard(recipient_id, payload):
+def send_keyboard(sender_id, keyboard_elements):
     params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
-    if payload is None:
-        payload = '68ff879e-9b22-4cab-ab32-23cac76a40d9'
-    keyboard_elements = get_keyboard_products(payload)
+
     data = json.dumps({
         'recipient': {
-            "id": recipient_id
+            "id": sender_id
         },
         'message': {
             'attachment': {
@@ -160,16 +275,17 @@ def send_keyboard(recipient_id, payload):
         params=params,
         data=data
         )
-    print(response.json())
+
+    pprint(response.json())
     response.raise_for_status()
 
 
-def send_message(recipient_id, message_text):
+def send_message(sender_id, message_text):
     params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
     request_content = json.dumps({
         "recipient": {
-            "id": recipient_id
+            "id": sender_id
         },
         "message": {
             "text": message_text
@@ -187,7 +303,6 @@ def main():
         host=os.getenv('REDIS_HOST'), password=os.getenv('REDIS_PASSWORD'),
         port=os.getenv('REDIS_PORT'), db=0, decode_responses=True)
     app.run(debug=True, host='0.0.0.0', port=80)
-
 
 
 if __name__ == '__main__':
