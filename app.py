@@ -1,13 +1,14 @@
 import os
 import json
-import redis
-
+from datetime import datetime
 from pprint import pprint
+import redis
 from dotenv import load_dotenv
 from loguru import logger
 import requests
 from flask import Flask, request
 
+import dateutil.parser
 from motlin_api import (
     get_access_token, get_image_link,
     get_products_by_category_id, get_all_categories)
@@ -186,6 +187,68 @@ def verify():
     return "Hello world", 200
 
 
+def create_menu():
+    access_token = get_access_token(redis_conn)
+    menu = {}
+    categories = get_all_categories(access_token)['data']
+    for category in categories:
+        keyboard_elements = []
+        print(category['id'])
+        products = get_products_by_category_id(access_token, category['id'])['data']
+        for product in products:
+            image_id = product['relationships']['main_image']['data']['id']
+            access_token = get_access_token(redis_conn)
+            image_link = get_image_link(access_token, image_id)['data']['link']['href']
+            keyboard_elements.append(
+                    {
+                        'title': product['name'] + ' ' + product['meta']['display_price']['with_tax']['formatted'],
+                        'subtitle': product['description'],
+                        'image_url': image_link,
+                        'buttons': [
+                            {
+                                'type': 'postback',
+                                'title': 'Положить в корзину',
+                                'payload': product['id'],
+                            }
+                        ]
+                    }
+            )
+        keyboard_elements.append(
+                {
+                    'title': 'Не нашли нужную пиццу?',
+                    'subtitle': 'Остальные пиццы можно посмотреть в одной из категории',
+                    'image_url': 'https://primepizza.ru/uploads/position/large_0c07c6fd5c4dcadddaf4a2f1a2c218760b20c396.jpg',
+                    'buttons': [
+                        {
+                            'type': 'postback',
+                            'title': f"В меню {category['name']} пиццы",
+                            'payload': category['id'],
+                        } for menu_category in categories if menu_category['id'] != category['id']]
+                }
+        )
+        menu[category['id']] = keyboard_elements
+    menu['created_at'] = datetime.now().isoformat()
+    print(len(menu))
+    return menu
+
+
+def get_menu():
+    cached_menu = redis_conn.get("menu")
+    if cached_menu is None:
+        menu = create_menu()
+        print(menu)
+        redis_conn.set("menu", json.dumps(menu))
+        return menu
+    cached_menu_time = dateutil.parser.parse(cached_menu['created_at'])
+    time_diff = datetime.now() - cached_menu_time
+    if time_diff.hours > 0:
+        menu = create_menu()
+        redis_conn.set("menu", json.dumps(menu))
+    else:
+        menu = cached_menu
+    return menu
+
+
 def get_keyboard_products(sender_id, category_id):
     keyboard_elements = [{
                 'title': 'Меню',
@@ -209,41 +272,7 @@ def get_keyboard_products(sender_id, category_id):
                     }
                 ]
             }]
-    access_token = get_access_token(redis_conn)
-    products = get_products_by_category_id(access_token, category_id)['data']
-    for product in products:
-        image_id = product['relationships']['main_image']['data']['id']
-        access_token = get_access_token(redis_conn)
-        image_link = get_image_link(access_token, image_id)['data']['link']['href']
-        keyboard_elements.append(
-            {
-                'title': product['name'] + ' ' + product['meta']['display_price']['with_tax']['formatted'],
-                'subtitle': product['description'],
-                'image_url': image_link,
-                'buttons': [
-                    {
-                        'type': 'postback',
-                        'title': 'Положить в корзину',
-                        'payload': product['id'],
-                    }
-                ]
-            }
-        )
-
-    categories = get_all_categories(access_token)['data']
-    keyboard_elements.append(
-            {
-                'title': 'Не нашли нужную пиццу?',
-                'subtitle': 'Остальные пиццы можно посмотреть в одной из категории',
-                'image_url': 'https://primepizza.ru/uploads/position/large_0c07c6fd5c4dcadddaf4a2f1a2c218760b20c396.jpg',
-                'buttons': [
-                    {
-                        'type': 'postback',
-                        'title': f"В меню {category['name']} пиццы",
-                        'payload': category['id'],
-                    } for category in categories if category['id'] != category_id]
-            }
-    )
+    keyboard_elements += get_menu()[category_id]
     return keyboard_elements
 
 
@@ -286,7 +315,11 @@ def send_message(sender_id, message_text):
             "text": message_text
         }
     })
-    response = requests.post("https://graph.facebook.com/v2.6/me/messages", params=params, headers=headers, data=request_content)
+    response = requests.post(
+        "https://graph.facebook.com/v2.6/me/messages",
+        params=params,
+        headers=headers,
+        data=request_content)
     response.raise_for_status()
 
 
