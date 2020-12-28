@@ -103,7 +103,7 @@ def handle_cart(update: Update, context: CallbackContext):
     """Показывает корзину"""
     access_token = get_access_token(redis_conn)
     chat_id = update.effective_user.id
-    cart = get_cart(access_token, chat_id)
+    cart = get_cart(access_token, f"tg-{chat_id}")
 
     keyboard = []
     keyboard.append([InlineKeyboardButton('В меню', callback_data='В меню')])
@@ -155,13 +155,13 @@ def handle_description(update: Update, context: CallbackContext):
 
     elif 'Убрать' in query.data:
         item_id = query.data.split("|")[1]
-        delete_from_cart(access_token, item_id, chat_id)
+        delete_from_cart(access_token, item_id, f"tg-{chat_id}")
         handle_cart(update, context)
         query.message.delete()
         return "HANDLE_DESCRIPTION"
 
     item_id = query.data
-    add_to_cart(access_token, 1, item_id, chat_id)
+    add_to_cart(access_token, 1, item_id, f"tg-{chat_id}")
     context.bot.send_message(
         text='added', chat_id=chat_id)
     return 'HANDLE_DESCRIPTION'
@@ -229,7 +229,7 @@ def send_the_order_to_the_courier(
         update, context, entry, user_chat_id, lat, lon):
 
     access_token = get_access_token(redis_conn)
-    cart = get_cart(access_token, user_chat_id)
+    cart = get_cart(access_token, f"tg-{user_chat_id}")
     text_message = format_cart(cart, context)[0]
     courier_id = entry['courier_id_telegram']
     context.bot.send_message(
