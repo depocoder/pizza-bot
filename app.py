@@ -23,7 +23,6 @@ def handle_start(sender_id, payload):
     if payload is None:
         payload = '68ff879e-9b22-4cab-ab32-23cac76a40d9'
     keyboard_elements = get_keyboard_products(sender_id, payload)
-    pprint(keyboard_elements)
     send_keyboard(sender_id, keyboard_elements)
     return "HANDLE_DESCRIPTION"
 
@@ -37,11 +36,7 @@ def handle_description(sender_id, payload):
         title, payload = None, None
     access_token = get_access_token(redis_conn)
 
-    if title in ['В меню', 'Сытные', 'Основные']:
-        handle_start(sender_id, payload)
-        return 'HANDLE_DESCRIPTION'
-
-    elif title == 'Корзина':
+    if title == 'Корзина':
         handle_cart(sender_id, payload)
         return "HANDLE_DESCRIPTION"
 
@@ -57,15 +52,17 @@ def handle_description(sender_id, payload):
         send_message(sender_id, f"Добавлена payload - {title}{payload}")
         add_to_cart(access_token, 1, payload, sender_id)
         return 'HANDLE_DESCRIPTION'
+    elif title:
+        if 'В меню' in title:  # Facebook почему-то делает запросы лишнии из-за этого тут возникают ошибки
+            handle_start(sender_id, payload)
+            return 'HANDLE_DESCRIPTION'
     return 'HANDLE_DESCRIPTION'
-    
 
 
 def format_cart(cart):
     """Форматирует корзину"""
     keyboard_cart = []
     for pizza in cart['data']:
-        pprint(pizza)
         keyboard_cart.append(
             {
                 'title': pizza['name'],
@@ -75,12 +72,12 @@ def format_cart(cart):
                     {
                         'type': 'postback',
                         'title': 'Добавить еще одну',
-                        'payload': pizza["id"],
+                        'payload': pizza["product_id"],
                     },
                     {
                         'type': 'postback',
                         'title': 'Убрать из корзины',
-                        'payload': pizza["id"],
+                        'payload': pizza["product_id"],
                     }
                 ]
             })
@@ -165,7 +162,6 @@ def webhook():
             for messaging_event in entry["messaging"]:
                 postback = messaging_event.get("postback")
                 if postback:
-                    pprint(postback)
                     payload = {}
                     payload['payload'] = postback['payload']
                     payload['title'] = postback['title']
@@ -243,7 +239,7 @@ def get_keyboard_products(sender_id, category_id):
                 'buttons': [
                     {
                         'type': 'postback',
-                        'title': category['name'],
+                        'title': f"В меню {category['name']} пиццы",
                         'payload': category['id'],
                     } for category in categories if category['id'] != category_id]
             }
@@ -276,7 +272,6 @@ def send_keyboard(sender_id, keyboard_elements):
         data=data
         )
 
-    pprint(response.json())
     response.raise_for_status()
 
 
