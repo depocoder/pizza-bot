@@ -3,18 +3,6 @@ import os
 import requests
 
 
-def get_all_entries(access_token):
-
-    response = requests.get(
-        'https://api.moltin.com/v2/flows/pizzeria/entries',
-        headers={
-            'Authorization': f'Bearer {access_token}',
-            })
-
-    response.raise_for_status()
-    return response.json()
-
-
 def get_access_token(redis_conn):
     access_token = redis_conn.get('access_token')
     if not access_token:
@@ -31,6 +19,43 @@ def get_access_token(redis_conn):
         access_token = token_info['access_token']
         redis_conn.set('access_token', access_token, ex=time_to_expire_s)
     return access_token
+
+
+def get_all_entries(access_token):
+    response = requests.get(
+        'https://api.moltin.com/v2/flows/pizzeria/entries',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            })
+
+    response.raise_for_status()
+    return response.json()
+
+
+def get_all_categories(access_token):
+    response = requests.get(
+        'https://api.moltin.com/v2/categories',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            })
+    response.raise_for_status()
+    return response.json()
+
+
+def get_products_by_category_id(access_token, category_id):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    params = {
+        'filter': f'eq(category.id,{category_id})'
+    }
+
+    response = requests.get(
+        'https://api.moltin.com/v2/products',
+        headers=headers,
+        params=params)
+    response.raise_for_status()
+    return response.json()
 
 
 def create_product(access_token, name, description, price, id_pizza):
