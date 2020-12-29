@@ -227,25 +227,19 @@ def create_menu():
                 }
         )
         menu[category['id']] = keyboard_elements
-    menu['created_at'] = datetime.now().isoformat()
     print(len(menu))
     return menu
 
 
 def get_menu():
     cached_menu = redis_conn.get("menu")
-    if cached_menu is None:
+    if not cached_menu:
         menu = create_menu()
-        print(menu)
-        redis_conn.set("menu", json.dumps(menu))
-        return menu
-    cached_menu_time = dateutil.parser.parse(cached_menu['created_at'])
-    time_diff = datetime.now() - cached_menu_time
-    if time_diff.hours > 0:
-        menu = create_menu()
-        redis_conn.set("menu", json.dumps(menu))
+        time_to_expire_s = 3600
+        redis_conn.set("menu", json.dumps(menu), ex=time_to_expire_s)
     else:
-        menu = cached_menu
+        print(type(cached_menu))
+        menu = json.loads(cached_menu)
     return menu
 
 
@@ -272,7 +266,9 @@ def get_keyboard_products(sender_id, category_id):
                     }
                 ]
             }]
-    keyboard_elements += get_menu()[category_id]
+    menu = get_menu()
+    print(menu)
+    keyboard_elements += menu[category_id]
     return keyboard_elements
 
 
