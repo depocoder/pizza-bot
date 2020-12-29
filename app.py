@@ -182,7 +182,7 @@ def verify():
     При верификации вебхука у Facebook он отправит запрос на этот адрес. На него нужно ответить VERIFY_TOKEN.
     """
     if request.args.get("hub.mode") == "subscribe" and request.args.get("hub.challenge"):
-        if not request.args.get("hub.verify_token") == os.getenv("VERIFY_TOKEN"):
+        if not request.args.get("hub.verify_token") == os.getenv("FB_VERIFY_TOKEN"):
             return "Verification token mismatch", 403
         return request.args["hub.challenge"], 200
 
@@ -277,7 +277,7 @@ def get_keyboard_products(sender_id, category_id):
 
 
 def send_keyboard(sender_id, keyboard_elements):
-    params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
+    params = {"access_token": os.getenv("FB_PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
 
     data = json.dumps({
@@ -305,7 +305,7 @@ def send_keyboard(sender_id, keyboard_elements):
 
 
 def send_message(sender_id, message_text):
-    params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
+    params = {"access_token": os.getenv("FB_PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
 
     request_content = json.dumps({
