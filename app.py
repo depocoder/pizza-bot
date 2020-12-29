@@ -35,6 +35,7 @@ def handle_description(sender_id, payload):
     else:
         title = payload['title']
         payload_id = payload['payload']
+
     access_token = get_access_token(redis_conn)
 
     if title == 'Корзина':
@@ -49,14 +50,17 @@ def handle_description(sender_id, payload):
         delete_from_cart(access_token, payload_id, sender_id)
         handle_cart(sender_id, payload_id)
         return "HANDLE_DESCRIPTION"
+
     elif title in ['Положить в корзину', 'Добавить еще одну']:
         send_message(sender_id, f"Добавлена payload - {title}{payload}")
         add_to_cart(access_token, 1, payload_id, sender_id)
         return 'HANDLE_DESCRIPTION'
+
     elif title:
         if 'В меню' in title:  # Facebook почему-то делает запросы лишнии из-за этого тут возникают ошибки
             handle_start(sender_id, payload_id)
             return 'HANDLE_DESCRIPTION'
+
     return 'HANDLE_DESCRIPTION'
 
 
@@ -193,7 +197,6 @@ def create_menu():
     categories = get_all_categories(access_token)['data']
     for category in categories:
         keyboard_elements = []
-        print(category['id'])
         products = get_products_by_category_id(access_token, category['id'])['data']
         for product in products:
             image_id = product['relationships']['main_image']['data']['id']
@@ -227,7 +230,6 @@ def create_menu():
                 }
         )
         menu[category['id']] = keyboard_elements
-    print(len(menu))
     return menu
 
 
@@ -238,7 +240,6 @@ def get_menu():
         time_to_expire_s = 3600
         redis_conn.set("menu", json.dumps(menu), ex=time_to_expire_s)
     else:
-        print(type(cached_menu))
         menu = json.loads(cached_menu)
     return menu
 
@@ -267,9 +268,6 @@ def get_keyboard_products(sender_id, category_id):
                 ]
             }]
     menu = get_menu()
-    category_id = category_id['payload']
-    print(category_id)
-    print(category_id)
     keyboard_elements += menu[category_id]
     return keyboard_elements
 
@@ -305,6 +303,7 @@ def send_keyboard(sender_id, keyboard_elements):
 def send_message(sender_id, message_text):
     params = {"access_token": os.getenv("PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
+
     request_content = json.dumps({
         "recipient": {
             "id": sender_id
@@ -313,6 +312,7 @@ def send_message(sender_id, message_text):
             "text": message_text
         }
     })
+
     response = requests.post(
         "https://graph.facebook.com/v2.6/me/messages",
         params=params,
