@@ -234,20 +234,17 @@ def add_to_cart(access_token, quantity, item_id, chat_id):
     response = requests.post(
         f'https://api.moltin.com/v2/carts/{chat_id}/items', headers=headers,
         json=data)
-    print(response.url)
     response.raise_for_status()
     return response.json()
 
 
 def delete_from_cart(access_token, item_id, chat_id):
-    print(item_id, chat_id, type(item_id), type(chat_id))
     response = requests.delete(
         f'https://api.moltin.com/v2/carts/{chat_id}/items/{item_id}',
         headers={
             'Authorization': f'Bearer {access_token}',
         }
     )
-    print(response.json())
     response.raise_for_status()
 
 

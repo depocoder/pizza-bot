@@ -1,21 +1,18 @@
 import os
 import json
 from datetime import datetime
-from pprint import pprint
+
 import redis
 from dotenv import load_dotenv
 from loguru import logger
 import requests
 from flask import Flask, request
 
-import dateutil.parser
 from motlin_api import (
     get_access_token, get_image_link,
-    get_products_by_category_id, get_all_categories)
-from motlin_api import (
-    get_products, get_access_token, get_element_by_id,
-    get_image_link, add_to_cart, get_cart, delete_from_cart,
-    get_all_entries, create_an_entry)
+    get_products_by_category_id, get_all_categories,
+    add_to_cart, get_cart, delete_from_cart)
+
 
 app = Flask(__name__)
 
@@ -67,6 +64,7 @@ def handle_description(sender_id, payload):
 def format_cart(cart):
     """Форматирует корзину"""
     keyboard_cart = []
+
     for pizza in cart['data']:
         keyboard_cart.append(
             {
@@ -110,6 +108,7 @@ def handle_cart(sender_id, payload):
                 ]
             })
         return "HANDLE_DESCRIPTION"
+
     keyboard_cart, total_to_pay = format_cart(cart)
     keyboard_elements = [
         {
@@ -134,6 +133,7 @@ def handle_cart(sender_id, payload):
                 ]
         }
     ]
+
     keyboard_elements += keyboard_cart
     send_keyboard(sender_id, keyboard_elements)
     return "HANDLE_DESCRIPTION"
@@ -195,13 +195,16 @@ def create_menu():
     access_token = get_access_token(redis_conn)
     menu = {}
     categories = get_all_categories(access_token)['data']
+
     for category in categories:
         keyboard_elements = []
         products = get_products_by_category_id(access_token, category['id'])['data']
+
         for product in products:
             image_id = product['relationships']['main_image']['data']['id']
             access_token = get_access_token(redis_conn)
             image_link = get_image_link(access_token, image_id)['data']['link']['href']
+
             keyboard_elements.append(
                     {
                         'title': product['name'] + ' ' + product['meta']['display_price']['with_tax']['formatted'],
@@ -216,6 +219,7 @@ def create_menu():
                         ]
                     }
             )
+
         keyboard_elements.append(
                 {
                     'title': 'Не нашли нужную пиццу?',
@@ -229,6 +233,7 @@ def create_menu():
                         } for menu_category in categories if menu_category['id'] != category['id']]
                 }
         )
+
         menu[category['id']] = keyboard_elements
     return menu
 
@@ -267,6 +272,7 @@ def get_keyboard_products(sender_id, category_id):
                     }
                 ]
             }]
+
     menu = get_menu()
     keyboard_elements += menu[category_id]
     return keyboard_elements
