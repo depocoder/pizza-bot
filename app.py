@@ -1,6 +1,5 @@
 import os
 import json
-from datetime import datetime
 
 import redis
 from dotenv import load_dotenv
@@ -32,7 +31,6 @@ def handle_description(sender_id, payload):
     else:
         title = payload['title']
         payload_id = payload['payload']
-
     access_token = get_access_token(redis_conn)
 
     if title == 'Корзина':
@@ -80,7 +78,7 @@ def format_cart(cart):
                     {
                         'type': 'postback',
                         'title': 'Убрать из корзины',
-                        'payload': pizza["product_id"],
+                        'payload': pizza["id"],
                     }
                 ]
             })
@@ -228,8 +226,8 @@ def create_menu():
                     'buttons': [
                         {
                             'type': 'postback',
-                            'title': f"В меню {category['name']} пиццы",
-                            'payload': category['id'],
+                            'title': f"В меню {menu_category['name']} пиццы",
+                            'payload': menu_category['id'],
                         } for menu_category in categories if menu_category['id'] != category['id']]
                 }
         )
