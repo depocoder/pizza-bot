@@ -30,15 +30,15 @@ def handle_start(sender_id, payload):
 
 def handle_description(sender_id, payload):
     """Отправляет по хэндлам"""
-    if payload is not None:
-        title = payload['title']
-        payload = payload['payload']
+    if payload is None:
+        title, payload_id = None, None
     else:
-        title, payload = None, None
+        title = payload['title']
+        payload_id = payload['payload']
     access_token = get_access_token(redis_conn)
 
     if title == 'Корзина':
-        handle_cart(sender_id, payload)
+        handle_cart(sender_id, payload_id)
         return "HANDLE_DESCRIPTION"
 
     elif title in ['Оплатить', 'Доставка', 'Самовывоз']:
@@ -46,16 +46,16 @@ def handle_description(sender_id, payload):
         return "HANDLE_WAITING"
 
     elif title == 'Убрать из корзины':
-        delete_from_cart(access_token, payload, sender_id)
-        handle_cart(sender_id, payload)
+        delete_from_cart(access_token, payload_id, sender_id)
+        handle_cart(sender_id, payload_id)
         return "HANDLE_DESCRIPTION"
     elif title in ['Положить в корзину', 'Добавить еще одну']:
         send_message(sender_id, f"Добавлена payload - {title}{payload}")
-        add_to_cart(access_token, 1, payload, sender_id)
+        add_to_cart(access_token, 1, payload_id, sender_id)
         return 'HANDLE_DESCRIPTION'
     elif title:
         if 'В меню' in title:  # Facebook почему-то делает запросы лишнии из-за этого тут возникают ошибки
-            handle_start(sender_id, payload)
+            handle_start(sender_id, payload_id)
             return 'HANDLE_DESCRIPTION'
     return 'HANDLE_DESCRIPTION'
 
@@ -267,7 +267,9 @@ def get_keyboard_products(sender_id, category_id):
                 ]
             }]
     menu = get_menu()
-    print(menu)
+    category_id = category_id['payload']
+    print(category_id)
+    print(category_id)
     keyboard_elements += menu[category_id]
     return keyboard_elements
 
