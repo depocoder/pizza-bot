@@ -241,7 +241,7 @@ def send_keyboard(sender_id, keyboard_elements):
     params = {"access_token": os.getenv("FB_PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
 
-    data = json.dumps({
+    data = {
         'recipient': {
             "id": sender_id
         },
@@ -254,14 +254,13 @@ def send_keyboard(sender_id, keyboard_elements):
                 }
             }
         }
-    })
+    }
     response = requests.post(
         'https://graph.facebook.com/v2.6/me/messages',
         headers=headers,
         params=params,
-        data=data
+        json=data
         )
-
     response.raise_for_status()
 
 
@@ -269,20 +268,20 @@ def send_message(sender_id, message_text):
     params = {"access_token": os.getenv("FB_PAGE_ACCESS_TOKEN")}
     headers = {"Content-Type": "application/json"}
 
-    request_content = json.dumps({
+    request_content = {
         "recipient": {
             "id": sender_id
         },
         "message": {
             "text": message_text
         }
-    })
+    }
 
     response = requests.post(
         "https://graph.facebook.com/v2.6/me/messages",
         params=params,
         headers=headers,
-        data=request_content)
+        json=request_content)
     response.raise_for_status()
 
 

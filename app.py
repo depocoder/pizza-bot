@@ -16,7 +16,7 @@ def webhook():
     """
     data = request.get_json()
     if data["object"] != "page":
-        return "ok", 200
+        return "false", 500
     for entry in data["entry"]:
         for messaging_event in entry["messaging"]:
             postback = messaging_event.get("postback")
@@ -28,6 +28,7 @@ def webhook():
                 payload = None
             if messaging_event.get("message") or postback:  # someone sent us a message
                 sender_id = messaging_event["sender"]["id"]        # the facebook ID of the person sending you the message
+                fb_bot.send_message(sender_id, 'message_text')
                 fb_bot.handle_users_reply(sender_id, payload)
     return "ok", 200
 
