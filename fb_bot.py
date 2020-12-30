@@ -202,8 +202,9 @@ def get_menu():
         menu = create_menu()
         time_to_expire_s = 3600
         redis_conn.set("menu", json.dumps(menu), ex=time_to_expire_s)
-    else:
-        menu = json.loads(cached_menu)
+        return menu
+
+    menu = json.loads(cached_menu)
     return menu
 
 
