@@ -17,7 +17,7 @@ app = Flask(__name__)
 
 
 def handle_start(sender_id, payload):
-    if payload is None:
+    if not payload:
         payload = '68ff879e-9b22-4cab-ab32-23cac76a40d9'
     keyboard_elements = get_keyboard_products(sender_id, payload)
     send_keyboard(sender_id, keyboard_elements)
@@ -26,7 +26,7 @@ def handle_start(sender_id, payload):
 
 def handle_description(sender_id, payload):
     """Отправляет по хэндлам"""
-    if payload is None:
+    if not payload:
         title, payload_id = None, None
     else:
         title = payload['title']
