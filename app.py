@@ -205,7 +205,7 @@ def create_menu():
 
             keyboard_elements.append(
                     {
-                        'title': product['name'] + ' ' + product['meta']['display_price']['with_tax']['formatted'],
+                        'title': f"{product['name']} {product['meta']['display_price']['with_tax']['formatted']}",
                         'subtitle': product['description'],
                         'image_url': image_link,
                         'buttons': [
