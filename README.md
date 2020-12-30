@@ -1,8 +1,15 @@
 # pizza-bot
  
  
-Этот проект позволяет создать своего телеграм бота для ресторанов пицц (Telegram). Этого бота еще нужно улучшать, стандарты MVP выполнены.
-Бот работает на [CMS](https://www.elasticpath.com/).    
+Этот проект позволяет создать своего телеграм бота для ресторанов пицц (Telegram, Facebook). Этого бота еще нужно улучшать, стандарты MVP выполнены.
+Бот работает на [CMS](https://www.elasticpath.com/).  
+    
+## О фейсбук боте
+Бот с минимальным функционалом, в отличие от телеграм бота, его надо допиливать.   
+Если хотите запустить бота делайте это через [ngrok](https://ngrok.com/) на своем ПК или деплойте на [heroku](https://dashboard.heroku.com/apps) к примеру.
+
+## О телеграм боте
+Весь функционал полностью исправен и отлажен, подключена платежка. На данном этапе бот почти готов для прода. Для телеграм бота не нужен ngrok, можете его запускать на своем пк или деплойте на [heroku](https://dashboard.heroku.com/apps) к примеру.
      
 ## Заполнение Flow
 Перед началом работы вам надо вручную создать Flow ваших пиццерий с `slug = pizzeria` указанным ниже.   
@@ -37,6 +44,7 @@ python3 upload.py
 
 ```
 python3 tg_bot.py
+python3 app.py
 ```
 
 Создайте файл ".env" в него надо прописать ваши token'ы.   
@@ -47,7 +55,9 @@ python3 tg_bot.py
 В переменную `REDIS_PORT` порт базы данных.    
 В переменную `REDIS_PASSWORD` пароль от базы данных.    
 В переменную `YANDEX_GEOCODER` полезный гайд как его получить [сайте](https://devman.org/encyclopedia/api-docs/yandex-geocoder-api/).    
-В переменную `TRANZZO_TOKEN` Меню Payments у BotFather /mybots, выберите бота, Payments. Выбрать банк и получить тестовый токен.    
+В переменную `TRANZZO_TOKEN` меню payments у BotFather /mybots, выберите бота, Payments. Выбрать банк и получить тестовый токен.    
+В переменную `FB_PAGE_ACCESS_TOKEN` его надо получить [тут](https://developers.facebook.com/apps/1000505683769580/messenger/settings/).    
+В переменную `FB_VERIFY_TOKEN` случайное значение для синхронизации в FB.    
     
 **Пример**  
 ```
@@ -59,4 +69,6 @@ REDIS_PORT=144895
 REDIS_PASSWORD=s2aH9KMoj24afChrCtOxxKbdvwRO2hSR
 YANDEX_GEOCODER=b8f9b3eb-bb4c-4eb1-129e-68369f9d7ebe
 TRANZZO_TOKEN=410694247:TEST:66734346-4a12-4092-b816-92cb0744489e
+FB_PAGE_ACCESS_TOKEN=EAAON9GfseOwBAGxyWIbv32ZAh42pFbAQo2YfAVnUMPgZApfWhmG6HngL7yh8pQtJVtchGTLrW3dpZC08qQNKYOEGGKqaUkICzB9wiWSmHhepXRdD9J1IGggQZCrZBHWoBKwPZBg5kJYBIZAYiweqtKrAuwWyWmUlj1yK8PbBzErZAQZDZD
+FB_VERIFY_TOKEN=23112314213241241
 ```
