@@ -16,7 +16,7 @@ def webhook():
     """
     data = request.get_json()
     if data["object"] != "page":
-        return "false", 500
+        return "false", 400
     for entry in data["entry"]:
         for messaging_event in entry["messaging"]:
             postback = messaging_event.get("postback")
